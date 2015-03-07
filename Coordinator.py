@@ -7,7 +7,6 @@ import utils
 exitFlag = 0
 NUM_NODES = 2
 OutConnectFlags = [False for i in range(NUM_NODES)] #coordinator acts as client
-#InConnectFlags = [False for i in range(NUM_NODES)] #coordinator acts as server
 MessageQueue = [[],[],[],[]] #coordinator acts as client, send msgs to A/B/C/D nodes
 RequestPool= []
 AckFlags = [True for i in range(NUM_NODES)]
@@ -131,12 +130,6 @@ class ChannelThread (threading.Thread):
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
-
-        '''self.clientSockets = []
-        for si in xrange(NUM_NODES):
-            st = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            st.settimeout(2)
-            self.clientSockets.append(st)'''
 
     def run(self):
         self.update()

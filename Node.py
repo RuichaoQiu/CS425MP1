@@ -98,7 +98,6 @@ class ClientThread (threading.Thread):
     @staticmethod
     def sendMsgToCoordinator(msg):
         global ClientSocket
-        #global OutConnectFlag
         if not ClientThread.outConnectFlag:
             ClientSocket.connect(("localhost", configure.GetCoodPortNumber()))
             ClientThread.outConnectFlag = True
