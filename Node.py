@@ -56,17 +56,31 @@ class ServerThread (threading.Thread):
     def processMsg(self, msg):
         #msg is the request broadcasted by coordinator
         msg_info = msg.split()
-        cmd = msg_info[0]
+        cmd, key = msg_info[0], int(msg_info[1])
         if cmd == "insert":
-            key, value = int(msg_info[1]), int(msg_info[2])
-            self.kvStore[key] = value
-            print "insert ", key, value
+            self.kvStore[key] = int(msg_info[2])
+            print "Inserted key {key} value {value}".format(key=key, value=self.kvStore[key])
         elif cmd == "delete":
-            pass
+            if self.validateKey(key):
+                del self.kvStore[key]
+                print "Key {key} deleted".format(key=key)
         elif cmd == "update":
-            pass
+            if self.validateKey(key):
+                old_value = self.kvStore[key]
+            else:
+                old_value = "NULL"
+            self.kvStore[key] = int(msg_info[2])
+            print "Key {key} changed from {old_value} to {new_value}".format(key=key, old_value=old_value, new_value = self.kvStore[key])
         elif cmd == "get":
-            pass
+            if self.validateKey(key):
+                print "get({key}) = {value}".format(key=key, value=self.kvStore[key])
+            #todo: call client thread to send value back to coordinator
+
+    def validateKey(self, key):
+        if not key in self.kvStore:
+            print "Key {key} does not exist!".format(key=key)
+            return False
+        return True
 
 class ClientThread (threading.Thread):
     outConnectFlag = False
@@ -88,12 +102,13 @@ class ClientThread (threading.Thread):
                 request = sys.stdin.readline()
                 request_info = request.split()
                 cmd = request_info[0].lower()
-                if IsCmdValid(cmd):
-                    ClientThread.sendMsgToCoordinator(request)
-                else:
-                    print "Invalid command"
+
+                if not IsCmdValid(cmd):
+                    print "Invalid command!"
                     #TODO: print out help menu
                     break
+
+                ClientThread.sendMsgToCoordinator(request)
 
     @staticmethod
     def sendMsgToCoordinator(msg):
