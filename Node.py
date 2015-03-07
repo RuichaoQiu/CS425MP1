@@ -18,11 +18,14 @@ MessageQueue = []
 
 Commands = ["delete", "get", "insert", "update"]
 
+ACK_MSG = "ack"
+
 class ServerThread (threading.Thread):
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
+        self.kvStore = dict()
     
     def run(self):
         CONNECTION_LIST = []
@@ -43,8 +46,10 @@ class ServerThread (threading.Thread):
                     try:
                         msg = read_socket.recv(RECV_BUFFER)
                         print "i receive msg: ", msg , " from coordinator"
-                        content, source = msg[:-2], msg[-1]
-                        #self.processMsg(content, source)
+                        #content, source = msg[:-2], msg[-1]
+                        self.processMsg(msg)
+                        print "sending ack..."
+                        thread2.sendMsgToCoordinator(ACK_MSG)
                     #print "Received "+" ".join(tmpl[:-1])+" from "+tmpl[-1]+", Max delay is "+str(configure.GetCoodDelay())+"s, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
                     except:
                         CONNECTION_LIST.remove(read_socket)
@@ -52,7 +57,22 @@ class ServerThread (threading.Thread):
                         continue     
         server_socket.close()
 
+    def processMsg(self, msg):
+        #msg is the request broadcasted by coordinator
+        msg_info = msg.split()
+        cmd = msg_info[0]
+        if cmd == "insert":
+            key, value = int(msg_info[1]), int(msg_info[2])
+            self.kvStore[key] = value
+            print "insert ", key, value
+        elif cmd == "delete":
+            pass
+        elif cmd == "update":
+            pass
+        elif cmd == "get":
+            pass
 
+'''
 def RunServer():
     CONNECTION_LIST = []
     RECV_BUFFER = 4096 
@@ -78,6 +98,7 @@ def RunServer():
                     CONNECTION_LIST.remove(sock)
                     continue     
     server_socket.close()
+'''
 
 class ClientThread (threading.Thread):
     def __init__(self, threadID, name):
@@ -86,51 +107,37 @@ class ClientThread (threading.Thread):
         self.name = name
 
     def run(self):
-        RunClient()
+        self.update()
 
-    def sendMsgToCoordinator(msg):
-        pass
+    def update(self):
+        global OutConnectFlag
+        global client_socket
+        node_name = sys.argv[1][0]
+        while 1:
+            socket_list = [sys.stdin]
+            read_sockets, write_sockets, error_sockets = select.select(socket_list , [], []) 
+            for sock in read_sockets:
+                request = sys.stdin.readline()
+                request_info = request.split()
+                cmd = request_info[0].lower()
+                if self.isCmdValid(cmd):
+                    self.sendMsgToCoordinator(request)
+                else:
+                    print "invalid cmd!"
+                    break
 
+    def isCmdValid(self, cmd):
+        global Commands
+        return cmd in Commands
 
-def isCmdValid(cmd):
-    return cmd in Commands
-
-def RunClient():
-    global OutConnectFlag
-    global client_socket
-    node_name = sys.argv[1][0]
-    while 1:
-        socket_list = [sys.stdin]
-        read_sockets, write_sockets, error_sockets = select.select(socket_list , [], []) 
-        for sock in read_sockets:
-            request = sys.stdin.readline()
-            request_info = request.split()
-            cmd = request_info[0].lower()
-            if isCmdValid(cmd):
-                if not OutConnectFlag:
-                    client_socket.connect(("localhost", configure.GetCoodPortNumber()))
-                    OutConnectFlag = True
-            else:
-                print "invalid cmd!"
-                break
-            
-            if cmd == "delete":
-                pass
-            elif cmd == "get":
-                pass
-            elif cmd == "insert":
-                pass
-            elif cmd == "update":
-                pass
-
-            #l = l[1:len(l)-1]
-            #l.append(sys.argv[1])
-            #tmpstr = " ".join(l)
-            #AddQueue(tmpstr,GenerateRandomDelay(configure.GetCoodDelay()))
-            #print "Sent "+ " ".join(l[:len(l)-1])+" to coordinator, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
-            AddQueue(request, GenerateRandomDelay(configure.GetCoodDelay()))
-            print "Sent %s to coordinator, system time is %s" % (request, datetime.datetime.now().time().strftime("%H:%M:%S"))
-            #print "Sent "+ " ".join(l[:len(l)-1])+" to coordinator, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
+    def sendMsgToCoordinator(self, msg):
+        global client_socket
+        global OutConnectFlag
+        if not OutConnectFlag:
+            client_socket.connect(("localhost", configure.GetCoodPortNumber()))
+            OutConnectFlag = True
+        AddQueue(msg, GenerateRandomDelay(configure.GetCoodDelay()))
+        print "Sent %s to coordinator, system time is %s" % (msg, datetime.datetime.now().time().strftime("%H:%M:%S"))
 
 def GenerateRandomDelay(x):
     if x == 0:
