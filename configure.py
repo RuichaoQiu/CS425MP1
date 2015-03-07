@@ -3,7 +3,10 @@ NodePortList = [4001, 4002, 4003, 4004]
 
 CoordinatorDelay = 5
 NodeDelayList = [4, 5, 6, 7]
-#DelayList = [[0,5,6,7,8],[5,0,6,7,8],[6,6,0,5,8],[7,7,5,0,8],[5,6,7,8,0]]
+
+Commands = ["delete", "get", "insert", "update"]
+
+ACK_MSG = "ack"
 
 def GetCoodPortNumber():
 	return CoordinatorPort
