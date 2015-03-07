@@ -136,8 +136,11 @@ class ClientThread (threading.Thread):
         if not OutConnectFlag:
             client_socket.connect(("localhost", configure.GetCoodPortNumber()))
             OutConnectFlag = True
-        AddQueue(msg, GenerateRandomDelay(configure.GetCoodDelay()))
-        print "Sent %s to coordinator, system time is %s" % (msg, datetime.datetime.now().time().strftime("%H:%M:%S"))
+        msg_to_send = msg.split()
+        msg_to_send.append(sys.argv[1][0])
+        msg_to_send = " ".join(msg_to_send)
+        AddQueue(msg_to_send, GenerateRandomDelay(configure.GetCoodDelay()))
+        print "Sent %s to coordinator, system time is %s" % (msg_to_send, datetime.datetime.now().time().strftime("%H:%M:%S"))
 
 def GenerateRandomDelay(x):
     if x == 0:

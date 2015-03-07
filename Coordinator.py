@@ -55,10 +55,12 @@ class ServerThread (threading.Thread):
         server_socket.close()
 
     def processMsg(self, msg, source):
+        print "haha! msg is: ", msg, "source is ", source
         global AckFlags
         if msg == "ack":
             #mark "I receive ack from source"
             AckFlags[ord(source[0])-ord('A')] = True
+            print AckFlags
         else:
             self.cacheRequest(msg)
 
@@ -69,48 +71,6 @@ class ServerThread (threading.Thread):
         RequestPool.append(request)
         print "new pool:", RequestPool
 
-
-#central server send request to A/B/C/D/ client
-'''def SendRequest(request, dest):
-    global ConnectFlag
-    global s
-    print "I am sending request " + request + " to " + dest
-    if not ConnectFlag[dest]:
-        s[dest].connect(("localhost", 4005))
-        ConnectFlag[source] = True
-    AddQueue(request, GenerateRandomDelay(configure.GetDelay(source, CENTRAL_SERVER)), CENTRAL_SERVER)
-    print "send " + request + " to central server!"'''
-        
-
-'''def send():
-    global ConnectFlag
-    global s
-    while 1:
-        socket_list = [sys.stdin]
-        read_sockets, write_sockets, error_sockets = select.select(socket_list , [], []) 
-        for sock in read_sockets:
-            if sock == sys.stdin:
-                print "receive request from stdin!"
-                request = sys.stdin.readline()
-                if not ConnectFlag[0]:
-                    s[CENTRAL_SERVER].connect(("localhost", 4005))
-                    ConnectFlag[0] = True
-                AddQueue(request, GenerateRandomDelay(configure.GetDelay(0, CENTRAL_SERVER)), CENTRAL_SERVER)
-                print "send " + request + " to central server!"
-            #l = msg.split()
-            #x = ord(sys.argv[1][0])-ord('A')
-            #y = ord(l[-1])-ord('A')
-            #if not ConnectFlag[x][y]:
-            #    s[y].connect(("localhost", configure.GetPortNumber(l[-1])))
-            #    ConnectFlag[x][y] = True
-            #l = l[1:len(l)-1]
-            #l.append(sys.argv[1])
-            #tmpstr = " ".join(l)
-            #AddQueue(tmpstr,GenerateRandomDelay(configure.GetDelay(x,y)),y)
-
-            #print "send msg "
-            #print "Sent "+ " ".join(l[:len(l)-1])+" to "+chr(y+ord('A'))+", system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
-   '''
 
 class ClientThread(threading.Thread):
     def __init__(self, threadID, name):
@@ -129,8 +89,9 @@ class ClientThread(threading.Thread):
                 self.resetAckFlags()
                 print "My client thread will broadcast this request: ", RequestPool[0]
                 self.broadcast(RequestPool[0])
-                if self.readyForNextRequest():
-                    RequestPool.pop(0)
+                RequestPool.pop(0)
+                #if self.readyForNextRequest():
+                    #RequestPool.pop(0)
             time.sleep(0.1)
 
     def readyForNextRequest(self):
@@ -154,7 +115,7 @@ class ClientThread(threading.Thread):
         if not OutConnectFlags[dest_id]:
             s[dest_id].connect(("localhost", configure.GetNodePortNumber(node_name)))
             OutConnectFlags[dest_id] = True
-            AddQueue(msg, GenerateRandomDelay(configure.GetNodeDelay(node_name)), dest_id)
+        AddQueue(msg, GenerateRandomDelay(configure.GetNodeDelay(node_name)), dest_id)
 
 
 def GenerateRandomDelay(x):
