@@ -1,8 +1,8 @@
 import configure
 import datetime
-import random
 import socket, select, string, sys
 import threading, time
+import utils
 
 exitFlag = 0
 NodeName = sys.argv[1][0]
@@ -13,12 +13,6 @@ MessageQueue = []
 
 def IsCmdValid(cmd):
     return cmd in configure.Commands
-
-def GenerateRandomDelay(x):
-    if x == 0:
-        return 0
-    return random.randint(1,x)
-
 
 class ServerThread (threading.Thread):
     def __init__(self, threadID, name):
@@ -108,7 +102,7 @@ class ClientThread (threading.Thread):
         if not ClientThread.outConnectFlag:
             ClientSocket.connect(("localhost", configure.GetCoodPortNumber()))
             ClientThread.outConnectFlag = True
-        ClientThread.addQueue(ClientThread.signMsg(msg), GenerateRandomDelay(configure.GetCoodDelay()))
+        ClientThread.addQueue(ClientThread.signMsg(msg), utils.GenerateRandomDelay(configure.GetCoodDelay()))
         print "Sent {msg} to coordinator, system time is {time}".format(msg=msg, time=datetime.datetime.now().time().strftime("%H:%M:%S"))
 
     @staticmethod

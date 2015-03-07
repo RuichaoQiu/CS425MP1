@@ -1,25 +1,26 @@
-import threading
-import time
-import socket, select, string, sys
 import configure
-import random
 import datetime
-exitFlag = 0
+import socket, select, string, sys
+import threading, time
+import utils
 
+exitFlag = 0
 NUM_NODES = 2
 OutConnectFlags = [False for i in range(NUM_NODES)] #coordinator acts as client
-InConnectFlags = [False for i in range(NUM_NODES)] #coordinator acts as server
-
+#InConnectFlags = [False for i in range(NUM_NODES)] #coordinator acts as server
 MessageQueue = [[],[],[],[]] #coordinator acts as client, send msgs to A/B/C/D nodes
-
-s = []
-for si in xrange(NUM_NODES):
-    st = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    st.settimeout(2)
-    s.append(st)
-
 RequestPool= []
 AckFlags = [True for i in range(NUM_NODES)]
+
+def CreateClientSockets():
+    s = []
+    for si in xrange(NUM_NODES):
+        st = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        st.settimeout(2)
+        s.append(st)
+    return s
+
+ClientSockets = CreateClientSockets()
 
 class ServerThread (threading.Thread):
     def __init__(self, threadID, name):
@@ -28,6 +29,9 @@ class ServerThread (threading.Thread):
         self.name = name
 
     def run(self):
+        self.update()
+
+    def update(self):
         CONNECTION_LIST = []
         RECV_BUFFER = 4096 
         PORT = configure.GetCoodPortNumber()
@@ -71,7 +75,6 @@ class ServerThread (threading.Thread):
         RequestPool.append(request)
         print "new pool:", RequestPool
 
-
 class ClientThread(threading.Thread):
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
@@ -110,46 +113,53 @@ class ClientThread(threading.Thread):
             self.unicast(msg, i)
 
     def unicast(self, msg, dest_id):
+        global ClientSockets
         print "sending msg to ", dest_id
         node_name = chr(ord('A') + dest_id)
         if not OutConnectFlags[dest_id]:
-            s[dest_id].connect(("localhost", configure.GetNodePortNumber(node_name)))
+            ClientSockets[dest_id].connect(("localhost", configure.GetNodePortNumber(node_name)))
             OutConnectFlags[dest_id] = True
-        AddQueue(msg, GenerateRandomDelay(configure.GetNodeDelay(node_name)), dest_id)
+        ClientThread.addQueue(msg, utils.GenerateRandomDelay(configure.GetNodeDelay(node_name)), dest_id)
 
-
-def GenerateRandomDelay(x):
-    if x == 0:
-        return 0
-    return random.randint(1,x)
-
-def AddQueue(messagestr,delaynum,dest):
-    global MessageQueue
-    MessageQueue[dest].append([datetime.datetime.now()+datetime.timedelta(0,delaynum),messagestr])
+    @staticmethod
+    def addQueue(messagestr,delaynum,dest):
+        global MessageQueue
+        MessageQueue[dest].append([datetime.datetime.now()+datetime.timedelta(0,delaynum),messagestr])
 
 class ChannelThread (threading.Thread):
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
-    def run(self):
-        RunChannel()
 
-def RunChannel():
-    global MessageQueue
-    global s
-    while 1:
-        CurTime = datetime.datetime.now()
+        '''self.clientSockets = []
         for si in xrange(NUM_NODES):
-            while MessageQueue[si] and MessageQueue[si][0][0] <= CurTime:
-                s[si].send(MessageQueue[si][0][1])
-                MessageQueue[si].pop(0)
-        time.sleep(0.1)
+            st = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            st.settimeout(2)
+            self.clientSockets.append(st)'''
 
-thread1 = ServerThread(1, "Thread-1")
-thread2 = ClientThread(2, "Thread-2")
-thread3 = ChannelThread(3, "Thread-3")
+    def run(self):
+        self.update()
 
-thread1.start()
-thread2.start()
-thread3.start()
+    def update(self):
+        global MessageQueue
+        global ClientSockets
+        while 1:
+            CurTime = datetime.datetime.now()
+            for si in xrange(NUM_NODES):
+                while MessageQueue[si] and MessageQueue[si][0][0] <= CurTime:
+                    ClientSockets[si].send(MessageQueue[si][0][1])
+                    MessageQueue[si].pop(0)
+            time.sleep(0.1)
+
+def main():
+    threads = []
+    threads.append(ServerThread(1, "ServerThread"))
+    threads.append(ClientThread(2, "ClientThread"))
+    threads.append(ChannelThread(3, "ChannelThread"))
+
+    for thread in threads:
+        thread.start()
+
+if __name__ == '__main__':
+    main()
