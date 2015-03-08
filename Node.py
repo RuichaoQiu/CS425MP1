@@ -11,6 +11,8 @@ NodeID = utils.NameToID(NodeName)
 
 ClientSockets = utils.CreateClientSockets(NUM_NODES + 1)
 MessageQueues = utils.CreateMessageQueues(NUM_NODES + 1)
+RequestQueue = []
+CoorAck = False
 
 def IsCmdValid(cmd):
     return cmd in configure.Commands
@@ -44,8 +46,8 @@ class ServerThread (threading.Thread):
                     try:
                         msg = read_socket.recv(RECV_BUFFER)
                         self.processMsg(msg)
-                        print "sending ack..."
-                        ClientThread.sendMsg(configure.ACK_MSG, NUM_NODES)
+                        #print "sending ack..."
+                        #ClientThread.sendMsg(configure.ACK_MSG, NUM_NODES)
                     #print "Received "+" ".join(tmpl[:-1])+" from "+tmpl[-1]+", Max delay is "+str(configure.GetCoodDelay())+"s, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
                     except:
                         CONNECTION_LIST.remove(read_socket)
@@ -54,7 +56,31 @@ class ServerThread (threading.Thread):
         server_socket.close()
 
     def processMsg(self, msg):
-        #msg is the request broadcasted by coordinator
+        print "receive msg: ", msg 
+        source_id = int(msg[-1])
+        msg_body = msg[:-2]
+        msg_split = msg_body.split()
+        print "source ", source_id, "msg_body: ", msg_body,
+        if source_id == NUM_NODES:              # 1: receive from coordinator
+            print "enter 1"
+            if msg_body == configure.ACK_MSG:       # 1.1: receive ack 
+                print "enter 1.1"
+                ClientThread.clientSideOutput()
+                CoorAck = False
+            elif msg_split[0] in configure.Commands:         # 1.2: receive broadcast request
+                self.executeRequest(msg_body)
+                ClientThread.sendMsg(configure.ACK_MSG, NUM_NODES)
+            else:                                   # 1.3: receive read result
+                pass
+        else:                                   # 2: receive from peer nodes
+            if msg_body == configure.ACK_MSG:       # 2.1: receive ack 
+                pass
+            elif msg_split[0] in configure.Commands:           # 2.2: receive peer request
+                pass
+            else:                                   # 2.3: receive read result
+                pass
+
+    def executeRequest(self, msg): #msg: "cmd key (value) model", no source_id
         msg_info = msg.split()
         cmd, key = msg_info[0], int(msg_info[1])
         if cmd == "insert":
@@ -108,8 +134,9 @@ class ClientThread (threading.Thread):
                     #TODO: print out help menu
                     break
 
-                #TODO: parse the request here
                 model = int(request_info[-1])
+                #RequestQueue.append(utils.Request(cmd, model, False))
+
                 if cmd == "get":
                     if model == 1:
                         ClientThread.sendMsg(request, NUM_NODES) #send request to coordinator
@@ -121,6 +148,7 @@ class ClientThread (threading.Thread):
                         pass
                 elif cmd == "insert":
                     if model == 1:
+                        RequestQueue.append(utils.Request(cmd, int(request_info[1]), int(request_info[2]), model))
                         ClientThread.sendMsg(request, NUM_NODES)
                     elif model == 2:
                         ClientThread.sendMsg(request, NUM_NODES)
@@ -147,10 +175,6 @@ class ClientThread (threading.Thread):
                     elif model == 4:
                         pass
 
-                #if linearazable & sequential - broadcast
-                #otherwise, reponse accordingly
-                #ClientThread.sendMsgToCoordinator(request)
-
     def isTotalOrdered(self):
         return True
 
@@ -161,20 +185,29 @@ class ClientThread (threading.Thread):
             print "build connect with ", dest_id
             ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
             ClientThread.outConnectFlags[dest_id] = True
-        ClientThread.addQueue(ClientThread.signMsg(msg), utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
-        print "Sent {msg} to coordinator, system time is {time}".format(msg=msg, time=datetime.datetime.now().time().strftime("%H:%M:%S"))
-
-    @staticmethod
-    def signMsg(msg):
-        signed_msg = msg.split()
-        signed_msg.append(str(NodeID))
-        return " ".join(signed_msg)
+        ClientThread.addQueue(utils.SignMsg(msg, str(NodeID)), utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
+        print "Sent {msg} to {dest}, system time is {time}".format(dest=dest_id, msg=msg, time=datetime.datetime.now().time().strftime("%H:%M:%S"))
 
     @staticmethod
     def addQueue(messagestr,delaynum, dest_id):
         print "add message ", messagestr, " to queue!"
         global MessageQueues
         MessageQueues[dest_id].append([datetime.datetime.now()+datetime.timedelta(0,delaynum),messagestr])
+
+    @staticmethod
+    def clientSideOutput():
+        print "Current requests: ", RequestQueue
+        if RequestQueue:
+            if RequestQueue[0].Cmd == "get":
+                pass
+            elif RequestQueue[0].Cmd == "insert":
+                print "Inserted key {key} value {value}".format(key=RequestQueue[0].Key, value=RequestQueue[0].Value)
+            elif RequestQueue[0].Cmd == "delete":
+                pass
+            elif RequestQueue[0].Cmd == "update":
+                pass
+            RequestQueue.pop(0)
+
 
 class ChannelThread (threading.Thread):
     def __init__(self, threadID, name):

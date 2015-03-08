@@ -88,11 +88,14 @@ class ClientThread(threading.Thread):
                 if RequestPool[0].Broadcast:
                     if self.readyForNextRequest():
                         RequestPool[0].ReceiveAck = True
+                        print "sending ack back to the issue client ", RequestPool[0].Source
+                        self.unicast(configure.ACK_MSG, RequestPool[0].Source)
                         RequestPool.pop(0)
-                        self.resetAckFlags()
+                        #self.resetAckFlags()
                 else:
-                    print "My client thread will broadcast this request: ", RequestPool[0]
+                    print "My client thread will broadcast this request: ", RequestPool[0].RequestMsg
                     RequestPool[0].Broadcast = True
+                    self.resetAckFlags()
                     self.broadcast(RequestPool[0])
 
             time.sleep(0.1)
@@ -114,12 +117,12 @@ class ClientThread(threading.Thread):
 
     def unicast(self, msg, dest_id):
         global ClientSockets
-        print "sending msg to ", dest_id
+        print "sending {msg} to {dest}".format(msg=msg, dest=dest_id)
         #node_name = chr(ord('A') + dest_id)
         if not OutConnectFlags[dest_id]:
             ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
             OutConnectFlags[dest_id] = True
-        ClientThread.addQueue(msg, utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
+        ClientThread.addQueue(utils.SignMsg(msg, str(NUM_NODES)), utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
 
     @staticmethod
     def addQueue(messagestr,delaynum,dest):
