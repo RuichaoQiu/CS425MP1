@@ -62,13 +62,13 @@ class ServerThread (threading.Thread):
             AckFlags[source_id] = True
             print AckFlags
         else:
-            self.cacheRequest(msg)
+            self.cacheRequest(msg, source_id)
 
-    def cacheRequest(self, request):
+    def cacheRequest(self, request, source_id):
         global RequestPool
         global AckFlags
         print "old pool:", RequestPool
-        RequestPool.append(request)
+        RequestPool.append(utils.RequestInfo(request, source_id, False, False))
         print "new pool:", RequestPool
 
 class ClientThread(threading.Thread):
@@ -84,13 +84,17 @@ class ClientThread(threading.Thread):
         global AckFlags
         global RequestPool
         while 1:
-            if self.readyForNextRequest() and RequestPool:
-                self.resetAckFlags()
-                print "My client thread will broadcast this request: ", RequestPool[0]
-                self.broadcast(RequestPool[0])
-                RequestPool.pop(0)
-                #if self.readyForNextRequest():
-                    #RequestPool.pop(0)
+            if RequestPool:
+                if RequestPool[0].Broadcast:
+                    if self.readyForNextRequest():
+                        RequestPool[0].ReceiveAck = True
+                        RequestPool.pop(0)
+                        self.resetAckFlags()
+                else:
+                    print "My client thread will broadcast this request: ", RequestPool[0]
+                    RequestPool[0].Broadcast = True
+                    self.broadcast(RequestPool[0])
+
             time.sleep(0.1)
 
     def readyForNextRequest(self):
@@ -104,9 +108,9 @@ class ClientThread(threading.Thread):
         global AckFlags
         AckFlags = [False for i in range(NUM_NODES)]
 
-    def broadcast(self, msg):
+    def broadcast(self, request):
         for i in range(NUM_NODES):
-            self.unicast(msg, i)
+            self.unicast(request.RequestMsg, i)
 
     def unicast(self, msg, dest_id):
         global ClientSockets

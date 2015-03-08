@@ -112,7 +112,7 @@ class ClientThread (threading.Thread):
                 model = int(request_info[-1])
                 if cmd == "get":
                     if model == 1:
-                        pass
+                        ClientThread.sendMsg(request, NUM_NODES) #send request to coordinator
                     elif model == 2:
                         pass
                     elif model == 3:
@@ -123,16 +123,16 @@ class ClientThread (threading.Thread):
                     if model == 1:
                         ClientThread.sendMsg(request, NUM_NODES)
                     elif model == 2:
-                        pass
+                        ClientThread.sendMsg(request, NUM_NODES)
                     elif model == 3:
                         pass
                     elif model == 4:
                         pass
                 elif cmd == "update":
                     if model == 1:
-                        pass
+                        ClientThread.sendMsg(request, NUM_NODES)
                     elif model == 2:
-                        pass
+                        ClientThread.sendMsg(request, NUM_NODES)
                     elif model == 3:
                         pass
                     elif model == 4:
@@ -161,7 +161,6 @@ class ClientThread (threading.Thread):
             print "build connect with ", dest_id
             ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
             ClientThread.outConnectFlags[dest_id] = True
-        print "haha got here!"
         ClientThread.addQueue(ClientThread.signMsg(msg), utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
         print "Sent {msg} to coordinator, system time is {time}".format(msg=msg, time=datetime.datetime.now().time().strftime("%H:%M:%S"))
 
