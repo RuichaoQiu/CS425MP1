@@ -7,19 +7,11 @@ import utils
 exitFlag = 0
 NUM_NODES = 2
 OutConnectFlags = [False for i in range(NUM_NODES)] #coordinator acts as client
-MessageQueue = [[],[],[],[]] #coordinator acts as client, send msgs to A/B/C/D nodes
+MessageQueues = [[] for i in range(NUM_NODES)] #coordinator acts as client, send msgs to A/B/C/D nodes
 RequestPool= []
 AckFlags = [True for i in range(NUM_NODES)]
 
-def CreateClientSockets():
-    s = []
-    for si in xrange(NUM_NODES):
-        st = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        st.settimeout(2)
-        s.append(st)
-    return s
-
-ClientSockets = CreateClientSockets()
+ClientSockets = utils.CreateClientSockets(NUM_NODES)
 
 class ServerThread (threading.Thread):
     def __init__(self, threadID, name):
@@ -33,7 +25,7 @@ class ServerThread (threading.Thread):
     def update(self):
         CONNECTION_LIST = []
         RECV_BUFFER = 4096 
-        PORT = configure.GetCoodPortNumber()
+        PORT = configure.PortList[NUM_NODES]
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.bind(("0.0.0.0", PORT))
@@ -48,7 +40,9 @@ class ServerThread (threading.Thread):
                 else:
                     try:
                         msg = read_socket.recv(RECV_BUFFER)
-                        content, source = msg[:-2], msg[-1]
+                        print "receive msg: ", msg
+                        content, source = msg[:-2], int(msg[-1])
+                        print "msg is ", content, "source is ", source
                         self.processMsg(content, source)
                     #print "Received "+" ".join(tmpl[:-1])+" from "+tmpl[-1]+", Max delay is "+str(configure.GetCoodDelay())+"s, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
                     except:
@@ -57,12 +51,15 @@ class ServerThread (threading.Thread):
                         continue     
         server_socket.close()
 
-    def processMsg(self, msg, source):
-        print "haha! msg is: ", msg, "source is ", source
+    def parseMsg(self, msg):
+        pass
+
+    def processMsg(self, msg, source_id):
+        print "haha! msg is: ", msg, "source is ", source_id
         global AckFlags
         if msg == "ack":
             #mark "I receive ack from source"
-            AckFlags[ord(source[0])-ord('A')] = True
+            AckFlags[source_id] = True
             print AckFlags
         else:
             self.cacheRequest(msg)
@@ -114,16 +111,16 @@ class ClientThread(threading.Thread):
     def unicast(self, msg, dest_id):
         global ClientSockets
         print "sending msg to ", dest_id
-        node_name = chr(ord('A') + dest_id)
+        #node_name = chr(ord('A') + dest_id)
         if not OutConnectFlags[dest_id]:
-            ClientSockets[dest_id].connect(("localhost", configure.GetNodePortNumber(node_name)))
+            ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
             OutConnectFlags[dest_id] = True
-        ClientThread.addQueue(msg, utils.GenerateRandomDelay(configure.GetNodeDelay(node_name)), dest_id)
+        ClientThread.addQueue(msg, utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
 
     @staticmethod
     def addQueue(messagestr,delaynum,dest):
-        global MessageQueue
-        MessageQueue[dest].append([datetime.datetime.now()+datetime.timedelta(0,delaynum),messagestr])
+        global MessageQueues
+        MessageQueues[dest].append([datetime.datetime.now()+datetime.timedelta(0,delaynum),messagestr])
 
 class ChannelThread (threading.Thread):
     def __init__(self, threadID, name):
@@ -135,14 +132,14 @@ class ChannelThread (threading.Thread):
         self.update()
 
     def update(self):
-        global MessageQueue
+        global MessageQueues
         global ClientSockets
         while 1:
             CurTime = datetime.datetime.now()
             for si in xrange(NUM_NODES):
-                while MessageQueue[si] and MessageQueue[si][0][0] <= CurTime:
-                    ClientSockets[si].send(MessageQueue[si][0][1])
-                    MessageQueue[si].pop(0)
+                while MessageQueues[si] and MessageQueues[si][0][0] <= CurTime:
+                    ClientSockets[si].send(MessageQueues[si][0][1])
+                    MessageQueues[si].pop(0)
             time.sleep(0.1)
 
 def main():

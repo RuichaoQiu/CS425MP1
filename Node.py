@@ -5,11 +5,12 @@ import threading, time
 import utils
 
 exitFlag = 0
+NUM_NODES = 2
 NodeName = sys.argv[1][0]
-ClientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-ClientSocket.settimeout(2)
-MessageQueue = []
+NodeID = utils.NameToID(NodeName)
 
+ClientSockets = utils.CreateClientSockets(NUM_NODES + 1)
+MessageQueues = utils.CreateMessageQueues(NUM_NODES + 1)
 
 def IsCmdValid(cmd):
     return cmd in configure.Commands
@@ -27,7 +28,7 @@ class ServerThread (threading.Thread):
     def update(self):
         CONNECTION_LIST = []
         RECV_BUFFER = 4096 
-        PORT = configure.GetNodePortNumber(sys.argv[1])
+        PORT = configure.PortList[NodeID]
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.bind(("0.0.0.0", PORT))
@@ -42,10 +43,9 @@ class ServerThread (threading.Thread):
                 else:
                     try:
                         msg = read_socket.recv(RECV_BUFFER)
-                        print "I receive msg: ", msg , " from coordinator!"
                         self.processMsg(msg)
                         print "sending ack..."
-                        ClientThread.sendMsgToCoordinator(configure.ACK_MSG)
+                        ClientThread.sendMsg(configure.ACK_MSG, NUM_NODES)
                     #print "Received "+" ".join(tmpl[:-1])+" from "+tmpl[-1]+", Max delay is "+str(configure.GetCoodDelay())+"s, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
                     except:
                         CONNECTION_LIST.remove(read_socket)
@@ -83,7 +83,7 @@ class ServerThread (threading.Thread):
         return True
 
 class ClientThread (threading.Thread):
-    outConnectFlag = False
+    outConnectFlags = [False for i in xrange(NUM_NODES + 1)]
 
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
@@ -94,7 +94,7 @@ class ClientThread (threading.Thread):
         self.update()
 
     def update(self):
-        global ClientSocket
+        global ClientSockets 
         while 1:
             socket_list = [sys.stdin]
             read_sockets, write_sockets, error_sockets = select.select(socket_list , [], []) 
@@ -108,28 +108,74 @@ class ClientThread (threading.Thread):
                     #TODO: print out help menu
                     break
 
-                ClientThread.sendMsgToCoordinator(request)
+                #TODO: parse the request here
+                model = int(request_info[-1])
+                if cmd == "get":
+                    if model == 1:
+                        pass
+                    elif model == 2:
+                        pass
+                    elif model == 3:
+                        pass
+                    elif model == 4:
+                        pass
+                elif cmd == "insert":
+                    if model == 1:
+                        ClientThread.sendMsg(request, NUM_NODES)
+                    elif model == 2:
+                        pass
+                    elif model == 3:
+                        pass
+                    elif model == 4:
+                        pass
+                elif cmd == "update":
+                    if model == 1:
+                        pass
+                    elif model == 2:
+                        pass
+                    elif model == 3:
+                        pass
+                    elif model == 4:
+                        pass
+                elif cmd == "delete":
+                    if model == 1:
+                        pass
+                    elif model == 2:
+                        pass
+                    elif model == 3:
+                        pass
+                    elif model == 4:
+                        pass
+
+                #if linearazable & sequential - broadcast
+                #otherwise, reponse accordingly
+                #ClientThread.sendMsgToCoordinator(request)
+
+    def isTotalOrdered(self):
+        return True
 
     @staticmethod
-    def sendMsgToCoordinator(msg):
-        global ClientSocket
-        if not ClientThread.outConnectFlag:
-            ClientSocket.connect(("localhost", configure.GetCoodPortNumber()))
-            ClientThread.outConnectFlag = True
-        ClientThread.addQueue(ClientThread.signMsg(msg), utils.GenerateRandomDelay(configure.GetCoodDelay()))
+    def sendMsg(msg, dest_id):
+        global ClientSockets
+        if not ClientThread.outConnectFlags[dest_id]:
+            print "build connect with ", dest_id
+            ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
+            ClientThread.outConnectFlags[dest_id] = True
+        print "haha got here!"
+        ClientThread.addQueue(ClientThread.signMsg(msg), utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
         print "Sent {msg} to coordinator, system time is {time}".format(msg=msg, time=datetime.datetime.now().time().strftime("%H:%M:%S"))
 
     @staticmethod
     def signMsg(msg):
         signed_msg = msg.split()
-        signed_msg.append(NodeName)
+        signed_msg.append(str(NodeID))
         return " ".join(signed_msg)
 
     @staticmethod
-    def addQueue(messagestr,delaynum):
+    def addQueue(messagestr,delaynum, dest_id):
         print "add message ", messagestr, " to queue!"
-        global MessageQueue
-        MessageQueue.append([datetime.datetime.now()+datetime.timedelta(0,delaynum),messagestr])
+        global MessageQueues
+        MessageQueues[dest_id].append([datetime.datetime.now()+datetime.timedelta(0,delaynum),messagestr])
 
 class ChannelThread (threading.Thread):
     def __init__(self, threadID, name):
@@ -141,13 +187,14 @@ class ChannelThread (threading.Thread):
         self.update()
 
     def update(self):
-        global MessageQueue
-        global ClientSocket
+        global MessageQueues
+        global ClientSockets
         while 1:
             CurTime = datetime.datetime.now()
-            while MessageQueue and MessageQueue[0][0] <= CurTime:
-                ClientSocket.send(MessageQueue[0][1])
-                MessageQueue.pop(0)
+            for si in xrange(NUM_NODES+1):
+                while MessageQueues[si] and MessageQueues[si][0][0] <= CurTime:
+                    ClientSockets[si].send(MessageQueues[si][0][1])
+                    MessageQueues[si].pop(0)
             time.sleep(0.1)
 
 def main():
