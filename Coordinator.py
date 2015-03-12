@@ -46,7 +46,6 @@ class ServerThread (threading.Thread):
                     try:
                         msg = read_socket.recv(RECV_BUFFER)
                         print "receive msg: ", msg
-                        print "going to process!"
                         self.processMsg(msg)
                     #print "Received "+" ".join(tmpl[:-1])+" from "+tmpl[-1]+", Max delay is "+str(configure.GetCoodDelay())+"s, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
                     except:
@@ -101,7 +100,6 @@ class ClientThread(threading.Thread):
                     BroadcastFlag = True
                     self.resetAckFlags()
                     self.broadcast(message.signNameForJsonStr(RequestPool[0][0], NUM_NODES))
-
             time.sleep(0.1)
 
     def readyForNextRequest(self):

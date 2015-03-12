@@ -51,7 +51,6 @@ class ServerThread (threading.Thread):
                     try:
                         msg = read_socket.recv(RECV_BUFFER)
                         self.processMsg(msg)
-                    #print "Received "+" ".join(tmpl[:-1])+" from "+tmpl[-1]+", Max delay is "+str(configure.GetCoodDelay())+"s, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
                     except:
                         CONNECTION_LIST.remove(read_socket)
                         read_socket.close()
@@ -63,6 +62,7 @@ class ServerThread (threading.Thread):
         print "receive msg: ", msg 
         msg_decoded = yaml.load(msg)
         if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
+            print "receive msg from coordinator"
             if msg_decoded['type'] == configure.ACK_MSG:       # 1.1: receive ack 
                 ClientThread.clientSideOutput("")
             elif msg_decoded['type'] == "request":         # 1.2: receive broadcast request
@@ -79,7 +79,7 @@ class ServerThread (threading.Thread):
                 key = msg_decoded['key']
                 ClientThread.clientSideOutput(self.kvStore[key]['value'])
         else:                                   # 2: receive from peer nodes
-            print "receive from peers!"
+            print "receive msg from peers!"
             global RequestQueue
             sender_peer = msg_decoded['sender']
             if msg_decoded['type'] == configure.ACK_MSG:       # 2.1: receive ack 
@@ -121,11 +121,11 @@ class ServerThread (threading.Thread):
                         ValueFromDiffNodes[:] = []
 
     #msg is dict decoded from json string
-    def executeRequest(self, msg): #msg: "cmd key (value) model", no source_id
+    def executeRequest(self, msg):
         key = msg['key']
         if msg['cmd'] == "insert":
             self.kvStore[key] = {'timestamp':msg['time'], 'value':int(msg['value'])}
-            print "Inserted key {key} value {value}".format(key=key, value=self.kvStore[key])
+            print "Inserted key {key} value {value}".format(key=key, value=self.kvStore[key]['value'])
         elif msg['cmd'] == "delete":
             if self.validateKey(key):
                 del self.kvStore[key]
@@ -140,7 +140,6 @@ class ServerThread (threading.Thread):
         elif msg['cmd'] == "get":
             if self.validateKey(key):
                 print "get({key}) = {value}".format(key=key, value=self.kvStore[key]['value'])
-            #todo: call client thread to send value back to coordinator
 
     def validateKey(self, key):
         if not key in self.kvStore:
@@ -210,14 +209,9 @@ class ClientThread (threading.Thread):
                         ClientThread.sendMsg(msg, NodeID)
                         ClientThread.sendMsg(msg, utils.GenerateRandomPeer(NUM_NODES, NodeID))
                 elif request.cmd == "delete":
-                    if model == 1:
-                        pass
-                    elif model == 2:
-                        pass
-                    elif model == 3:
-                        pass
-                    elif model == 4:
-                        pass
+                    request.signName(NodeID)
+                    msg = json.dumps(request, cls=message.MessageEncoder)
+                    ClientThread.sendMsg(msg, NUM_NODES)
 
 
     @staticmethod
@@ -239,14 +233,14 @@ class ClientThread (threading.Thread):
 
     @staticmethod
     def clientSideOutput(option_value):
-        print "Current requests: ", RequestQueue[0]
+        #print "Current requests: ", RequestQueue[0]
         if RequestQueue:
             if RequestQueue[0].cmd == "get":
                 print "client side: get({key}) = {value}".format(key=RequestQueue[0].key, value=option_value)           
             elif RequestQueue[0].cmd == "insert":
                 print "client side: Inserted key {key} value {value}".format(key=RequestQueue[0].key, value=RequestQueue[0].value)
             elif RequestQueue[0].cmd == "delete":
-                pass
+                print "client side: Key {key} deleted.".format(key=RequestQueue[0].key)
             elif RequestQueue[0].cmd == "update":
                 print "client side: Key {key} updated to {value}".format(key=RequestQueue[0].key, value=RequestQueue[0].value)
             RequestQueue.pop(0)
