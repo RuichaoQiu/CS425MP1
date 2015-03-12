@@ -1,3 +1,4 @@
+import datetime
 import random
 import socket
 
@@ -5,6 +6,12 @@ def GenerateRandomDelay(x):
     if x == 0:
         return 0
     return random.randint(1,x)
+
+def GenerateRandomPeer(num_nodes, current):
+	while True:
+		r = random.randint(0,num_nodes-1)
+		if r != current:
+			return r
 
 def CreateClientSockets(num_socket):
     s = []
@@ -20,22 +27,8 @@ def CreateMessageQueues(num_queue):
 def NameToID(node_name):
 	return ord(node_name[0])-ord('A')
 
-#Request = namedtuple('Request', 'RequestMsg, Source, Broadcast, ReceiveAck')
-def SignMsg(msg, signature):
- 	signed_msg = msg.split()
- 	signed_msg.append(signature)
- 	return " ".join(signed_msg)
+def TimestampCmp(ts1, ts2):
+	dt1 = datetime.datetime.strptime(ts1, "%H:%M:%S")
+	dt2 = datetime.datetime.strptime(ts2, "%H:%M:%S")
+	return dt1 > dt2
 
-class Request(object):
-	def __init__(self, Cmd, Key, Value, Model):
-		self.Cmd = Cmd
-		self.Model = Model
-		self.Key = Key
-		self.Value = Value
-
-class RequestInfo(object):
-	def __init__(self, RequestMsg, Source, Broadcast, ReceiveAck):
-		self.RequestMsg = RequestMsg
-		self.Source = Source
-		self.Broadcast = Broadcast
-		self.ReceiveAck = ReceiveAck

@@ -16,7 +16,7 @@ NodeID = utils.NameToID(NodeName)
 ClientSockets = utils.CreateClientSockets(NUM_NODES + 1)
 MessageQueues = utils.CreateMessageQueues(NUM_NODES + 1)
 RequestQueue = [] #Request object
-#CoorAck = False
+ValueFromDiffNodes = []
 
 def IsCmdValid(cmd):
     return cmd in configure.Commands
@@ -61,11 +61,9 @@ class ServerThread (threading.Thread):
     def processMsg(self, msg):
         print "receive msg: ", msg 
         msg_decoded = yaml.load(msg)
-        print "then sender is ", msg_decoded['sender']
         if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
             if msg_decoded['type'] == configure.ACK_MSG:       # 1.1: receive ack 
                 ClientThread.clientSideOutput("")
-                #ClientThread.clientSideOutput(self.kvStore[key]['value'])
             elif msg_decoded['type'] == "request":         # 1.2: receive broadcast request
                 self.executeRequest(msg_decoded)
                 if msg_decoded['cmd'] == "get": #read, return value
@@ -77,7 +75,6 @@ class ServerThread (threading.Thread):
                 json_str = json.dumps(ack_msg, cls=message.MessageEncoder)
                 ClientThread.sendMsg(json_str, NUM_NODES)
             else:                                   # 1.3: receive read result
-                print "here!!"
                 key = msg_decoded['key']
                 ClientThread.clientSideOutput(self.kvStore[key]['value'])
         else:                                   # 2: receive from peer nodes
@@ -94,15 +91,25 @@ class ServerThread (threading.Thread):
                     json_str = json.dumps(value_msg, cls=message.MessageEncoder)
                     ClientThread.sendMsg(json_str, sender_peer)
                 else:
-                    print "here!!"
                     ack_msg = message.Message("ack")
                     ack_msg.signName(NodeID)
                     json_str = json.dumps(ack_msg, cls=message.MessageEncoder)
-                    print json_str
                     ClientThread.sendMsg(json_str, sender_peer)
             elif msg_decoded['type'] == 'ValueResponse':                               # 2.3: receive read result
-                ClientThread.clientSideOutput(msg_decoded['value'])
-                
+                global RequestQueue
+                if RequestQueue and RequestQueue[0].model != 4:     
+                    ClientThread.clientSideOutput(msg_decoded['value'])
+                else:
+                    ValueFromDiffNodes.append([msg_decoded['value'], msg_decoded['timestamp']])
+                    print ValueFromDiffNodes
+                    if len(ValueFromDiffNodes) == 2:
+                        if utils.TimestampCmp(ValueFromDiffNodes[0][1], ValueFromDiffNodes[1][1]):
+                            latest_value = ValueFromDiffNodes[0][0]
+                        else:
+                            latest_value = ValueFromDiffNodes[1][0]
+                        print "latest_value: ", latest_value
+                        ClientThread.clientSideOutput(latest_value)
+                        ValueFromDiffNodes[:] = []
 
     #msg is dict decoded from json string
     def executeRequest(self, msg): #msg: "cmd key (value) model", no source_id
@@ -172,21 +179,11 @@ class ClientThread (threading.Thread):
                         msg = json.dumps(request, cls=message.MessageEncoder)
                         ClientThread.sendMsg(msg, NodeID)
                     elif model == 4:
-                        pass
-                elif request.cmd == "insert":
-                    if model == 1 or model == 2:
-                        request.signTime()
-                        request.signName(NodeID)
-                        msg = json.dumps(request,cls=message.MessageEncoder)
-                        ClientThread.sendMsg(msg, NUM_NODES)
-                    elif model == 3:
-                        request.signTime()
                         request.signName(NodeID)
                         msg = json.dumps(request, cls=message.MessageEncoder)
                         ClientThread.sendMsg(msg, NodeID)
-                    elif model == 4:
-                        pass
-                elif request.cmd == "update":
+                        ClientThread.sendMsg(msg, utils.GenerateRandomPeer(NUM_NODES, NodeID))
+                elif request.cmd == "insert" or request.cmd == "update":
                     if model == 1 or model == 2:
                         request.signTime()
                         request.signName(NodeID)
@@ -232,10 +229,7 @@ class ClientThread (threading.Thread):
         #print "Current requests: ", RequestQueue[0]
         if RequestQueue:
             if RequestQueue[0].cmd == "get":
-                if RequestQueue[0].model in [1,2]:
-                    print "client side: get({key}) = {value}".format(key=RequestQueue[0].key, value=option_value)
-                else:
-                    pass
+                print "client side: get({key}) = {value}".format(key=RequestQueue[0].key, value=option_value)           
             elif RequestQueue[0].cmd == "insert":
                 print "client side: Inserted key {key} value {value}".format(key=RequestQueue[0].key, value=RequestQueue[0].value)
             elif RequestQueue[0].cmd == "delete":
@@ -261,7 +255,6 @@ class ChannelThread (threading.Thread):
             CurTime = datetime.datetime.now()
             for si in xrange(NUM_NODES+1):
                 while MessageQueues[si] and MessageQueues[si][0][0] <= CurTime:
-                    print "haha sending!"
                     ClientSockets[si].send(MessageQueues[si][0][1])
                     MessageQueues[si].pop(0)
             time.sleep(0.1)
