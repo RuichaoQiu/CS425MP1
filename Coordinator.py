@@ -12,7 +12,7 @@ exitFlag = 0
 NUM_NODES = 2
 OutConnectFlags = [False for i in range(NUM_NODES)] #coordinator acts as client
 MessageQueues = [[] for i in range(NUM_NODES)] #coordinator acts as client, send msgs to A/B/C/D nodes
-RequestPool= []
+RequestPool= [] #[request, sender]
 BroadcastFlag = False
 AckFlags = [True for i in range(NUM_NODES)]
 
@@ -59,14 +59,13 @@ class ServerThread (threading.Thread):
     def processMsg(self, msg):
         decoded_msg = yaml.load(msg)
         global AckFlags
-        if decoded_msg['type'] == "ack":
+        if decoded_msg['type'] in ["ack", "ValueResponse"]:
             AckFlags[decoded_msg['sender']] = True
             print AckFlags
         elif decoded_msg['type'] == "request":
             print "caching request from ",decoded_msg['sender']
             self.cacheRequest(msg, decoded_msg['sender'])
     
-
     def cacheRequest(self, request, sender):
         global RequestPool
         global AckFlags

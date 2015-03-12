@@ -61,8 +61,9 @@ class Request(Message):
 
 class ValueResponse(Message):
 	def __init__(self, value):
-		Message.__init__(self, value)
-		self.value = int(value)
+		Message.__init__(self, value_timestamp_pair)
+		self.value = int(value_timestamp_pair['value'])
+		self.timestamp = value_timestamp_pair['timestamp']
 		self.type = "ValueResponse"
 
 	def __json__(self):
@@ -70,7 +71,7 @@ class ValueResponse(Message):
 			type=self.type, \
 			value=self.value, \
 			sender=self.sender, \
-			time=self.time, \
+			timestamp=self.timestamp, \
 			)
 
 class MessageEncoder(JSONEncoder):
@@ -79,8 +80,13 @@ class MessageEncoder(JSONEncoder):
 
 def signNameForJsonStr(json_msg_str, name):
 	decoded_msg = yaml.load(json_msg_str)
+	decoded_msg['original_sender'] = decoded_msg['sender']
 	decoded_msg['sender'] = int(name)
 	return json.dumps(decoded_msg)
+
+def isRead(json_msg_str):
+	decoded_msg = yaml.load(json_msg_str)
+	return decoded_msg['cmd'] == 'get'
 
 '''request = Request("insert 1 2 3")
 json_str = json.dumps(request, cls=MessageEncoder)
