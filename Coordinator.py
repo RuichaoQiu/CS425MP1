@@ -1,7 +1,11 @@
-import configure
 import datetime
 import socket, select, string, sys
 import threading, time
+import yaml
+import json
+
+import configure
+import message
 import utils
 
 exitFlag = 0
@@ -9,6 +13,7 @@ NUM_NODES = 2
 OutConnectFlags = [False for i in range(NUM_NODES)] #coordinator acts as client
 MessageQueues = [[] for i in range(NUM_NODES)] #coordinator acts as client, send msgs to A/B/C/D nodes
 RequestPool= []
+BroadcastFlag = False
 AckFlags = [True for i in range(NUM_NODES)]
 
 ClientSockets = utils.CreateClientSockets(NUM_NODES)
@@ -41,9 +46,8 @@ class ServerThread (threading.Thread):
                     try:
                         msg = read_socket.recv(RECV_BUFFER)
                         print "receive msg: ", msg
-                        content, source = msg[:-2], int(msg[-1])
-                        print "msg is ", content, "source is ", source
-                        self.processMsg(content, source)
+                        print "going to process!"
+                        self.processMsg(msg)
                     #print "Received "+" ".join(tmpl[:-1])+" from "+tmpl[-1]+", Max delay is "+str(configure.GetCoodDelay())+"s, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
                     except:
                         CONNECTION_LIST.remove(read_socket)
@@ -51,24 +55,23 @@ class ServerThread (threading.Thread):
                         continue     
         server_socket.close()
 
-    def parseMsg(self, msg):
-        pass
-
-    def processMsg(self, msg, source_id):
-        print "haha! msg is: ", msg, "source is ", source_id
+    # msg is json string format
+    def processMsg(self, msg):
+        decoded_msg = yaml.load(msg)
         global AckFlags
-        if msg == "ack":
-            #mark "I receive ack from source"
-            AckFlags[source_id] = True
+        if decoded_msg['type'] == "ack":
+            AckFlags[decoded_msg['sender']] = True
             print AckFlags
-        else:
-            self.cacheRequest(msg, source_id)
+        elif decoded_msg['type'] == "request":
+            print "caching request from ",decoded_msg['sender']
+            self.cacheRequest(msg, decoded_msg['sender'])
+    
 
-    def cacheRequest(self, request, source_id):
+    def cacheRequest(self, request, sender):
         global RequestPool
         global AckFlags
         print "old pool:", RequestPool
-        RequestPool.append(utils.RequestInfo(request, source_id, False, False))
+        RequestPool.append([request, sender])
         print "new pool:", RequestPool
 
 class ClientThread(threading.Thread):
@@ -83,20 +86,22 @@ class ClientThread(threading.Thread):
     def update(self):
         global AckFlags
         global RequestPool
+        global BroadcastFlag 
         while 1:
             if RequestPool:
-                if RequestPool[0].Broadcast:
+                if BroadcastFlag:
                     if self.readyForNextRequest():
-                        RequestPool[0].ReceiveAck = True
-                        print "sending ack back to the issue client ", RequestPool[0].Source
-                        self.unicast(configure.ACK_MSG, RequestPool[0].Source)
+                        print "sending ack back to the issue client ", RequestPool[0][1]
+                        ack_msg = message.Message("ack")
+                        ack_msg.signName(NUM_NODES)
+                        self.unicast(json.dumps(ack_msg, cls=message.MessageEncoder), RequestPool[0][1])
                         RequestPool.pop(0)
-                        #self.resetAckFlags()
+                        BroadcastFlag = False
                 else:
-                    print "My client thread will broadcast this request: ", RequestPool[0].RequestMsg
-                    RequestPool[0].Broadcast = True
+                    print "My client thread will broadcast this request: ", RequestPool[0]
+                    BroadcastFlag = True
                     self.resetAckFlags()
-                    self.broadcast(RequestPool[0])
+                    self.broadcast(message.signNameForJsonStr(RequestPool[0][0], NUM_NODES))
 
             time.sleep(0.1)
 
@@ -111,10 +116,12 @@ class ClientThread(threading.Thread):
         global AckFlags
         AckFlags = [False for i in range(NUM_NODES)]
 
+    #request is json string format
     def broadcast(self, request):
         for i in range(NUM_NODES):
-            self.unicast(request.RequestMsg, i)
+            self.unicast(request, i)
 
+    #msg is json string format
     def unicast(self, msg, dest_id):
         global ClientSockets
         print "sending {msg} to {dest}".format(msg=msg, dest=dest_id)
@@ -122,7 +129,7 @@ class ClientThread(threading.Thread):
         if not OutConnectFlags[dest_id]:
             ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
             OutConnectFlags[dest_id] = True
-        ClientThread.addQueue(utils.SignMsg(msg, str(NUM_NODES)), utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
+        ClientThread.addQueue(msg, utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
 
     @staticmethod
     def addQueue(messagestr,delaynum,dest):

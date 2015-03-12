@@ -1,7 +1,11 @@
-import configure
 import datetime
+import json
 import socket, select, string, sys
 import threading, time
+import yaml
+
+import configure
+import message
 import utils
 
 exitFlag = 0
@@ -11,7 +15,7 @@ NodeID = utils.NameToID(NodeName)
 
 ClientSockets = utils.CreateClientSockets(NUM_NODES + 1)
 MessageQueues = utils.CreateMessageQueues(NUM_NODES + 1)
-RequestQueue = []
+RequestQueue = [] #Request object
 CoorAck = False
 
 def IsCmdValid(cmd):
@@ -55,49 +59,49 @@ class ServerThread (threading.Thread):
                         continue     
         server_socket.close()
 
+    #msg is json string
     def processMsg(self, msg):
         print "receive msg: ", msg 
-        source_id = int(msg[-1])
-        msg_body = msg[:-2]
-        msg_split = msg_body.split()
-        print "source ", source_id, "msg_body: ", msg_body,
-        if source_id == NUM_NODES:              # 1: receive from coordinator
-            print "enter 1"
-            if msg_body == configure.ACK_MSG:       # 1.1: receive ack 
-                print "enter 1.1"
+        msg_decoded = yaml.load(msg)
+        if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
+            if msg_decoded['type'] == configure.ACK_MSG:       # 1.1: receive ack 
                 ClientThread.clientSideOutput()
                 CoorAck = False
-            elif msg_split[0] in configure.Commands:         # 1.2: receive broadcast request
-                self.executeRequest(msg_body)
-                ClientThread.sendMsg(configure.ACK_MSG, NUM_NODES)
+            elif msg_decoded['type'] == "request":         # 1.2: receive broadcast request
+                self.executeRequest(msg_decoded)
+                ack_msg = message.Message("ack")
+                ack_msg.signName(NodeID)
+                json_str = json.dumps(ack_msg, cls=message.MessageEncoder)
+                print "json_str: ", json_str
+                ClientThread.sendMsg(json_str, NUM_NODES)
             else:                                   # 1.3: receive read result
                 pass
         else:                                   # 2: receive from peer nodes
-            if msg_body == configure.ACK_MSG:       # 2.1: receive ack 
+            if msg_decoded['type'] == configure.ACK_MSG:       # 2.1: receive ack 
                 pass
-            elif msg_split[0] in configure.Commands:           # 2.2: receive peer request
+            elif msg_decoded['type'] == "request":           # 2.2: receive peer request
                 pass
             else:                                   # 2.3: receive read result
                 pass
 
+    #msg is dict decoded from json string
     def executeRequest(self, msg): #msg: "cmd key (value) model", no source_id
-        msg_info = msg.split()
-        cmd, key = msg_info[0], int(msg_info[1])
-        if cmd == "insert":
-            self.kvStore[key] = int(msg_info[2])
+        key = msg['key']
+        if msg['cmd'] == "insert":
+            self.kvStore[key] = int(msg['value'])
             print "Inserted key {key} value {value}".format(key=key, value=self.kvStore[key])
-        elif cmd == "delete":
+        elif msg['cmd'] == "delete":
             if self.validateKey(key):
                 del self.kvStore[key]
                 print "Key {key} deleted".format(key=key)
-        elif cmd == "update":
+        elif msg['cmd'] == "update":
             if self.validateKey(key):
                 old_value = self.kvStore[key]
             else:
                 old_value = "NULL"
-            self.kvStore[key] = int(msg_info[2])
+            self.kvStore[key] = int(msg['value'])
             print "Key {key} changed from {old_value} to {new_value}".format(key=key, old_value=old_value, new_value = self.kvStore[key])
-        elif cmd == "get":
+        elif msg['cmd'] == "get":
             if self.validateKey(key):
                 print "get({key}) = {value}".format(key=key, value=self.kvStore[key])
             #todo: call client thread to send value back to coordinator
@@ -125,19 +129,16 @@ class ClientThread (threading.Thread):
             socket_list = [sys.stdin]
             read_sockets, write_sockets, error_sockets = select.select(socket_list , [], []) 
             for sock in read_sockets:
-                request = sys.stdin.readline()
-                request_info = request.split()
-                cmd = request_info[0].lower()
-
-                if not IsCmdValid(cmd):
+                request = message.Request(sys.stdin.readline())
+                
+                if not IsCmdValid(request.cmd):
                     print "Invalid command!"
                     #TODO: print out help menu
                     break
 
-                model = int(request_info[-1])
-                #RequestQueue.append(utils.Request(cmd, model, False))
-
-                if cmd == "get":
+                model = request.model
+                RequestQueue.append(request)
+                if request.cmd == "get":
                     if model == 1:
                         ClientThread.sendMsg(request, NUM_NODES) #send request to coordinator
                     elif model == 2:
@@ -146,26 +147,27 @@ class ClientThread (threading.Thread):
                         pass
                     elif model == 4:
                         pass
-                elif cmd == "insert":
-                    if model == 1:
-                        RequestQueue.append(utils.Request(cmd, int(request_info[1]), int(request_info[2]), model))
-                        ClientThread.sendMsg(request, NUM_NODES)
-                    elif model == 2:
-                        ClientThread.sendMsg(request, NUM_NODES)
+                elif request.cmd == "insert":
+                    if model == 1 or model == 2:
+                        request.signTime()
+                        request.signName(NodeID)
+                        msg = json.dumps(request,cls=message.MessageEncoder)
+                        ClientThread.sendMsg(msg, NUM_NODES)
                     elif model == 3:
                         pass
                     elif model == 4:
                         pass
-                elif cmd == "update":
-                    if model == 1:
-                        ClientThread.sendMsg(request, NUM_NODES)
-                    elif model == 2:
-                        ClientThread.sendMsg(request, NUM_NODES)
+                elif request.cmd == "update":
+                    if model == 1 or model == 2:
+                        request.signTime()
+                        request.signName(NodeID)
+                        msg = json.dumps(request,cls=message.MessageEncoder)
+                        ClientThread.sendMsg(msg, NUM_NODES)
                     elif model == 3:
                         pass
                     elif model == 4:
                         pass
-                elif cmd == "delete":
+                elif request.cmd == "delete":
                     if model == 1:
                         pass
                     elif model == 2:
@@ -175,17 +177,16 @@ class ClientThread (threading.Thread):
                     elif model == 4:
                         pass
 
-    def isTotalOrdered(self):
-        return True
 
     @staticmethod
+    #msg is json string
     def sendMsg(msg, dest_id):
         global ClientSockets
         if not ClientThread.outConnectFlags[dest_id]:
             print "build connect with ", dest_id
             ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
             ClientThread.outConnectFlags[dest_id] = True
-        ClientThread.addQueue(utils.SignMsg(msg, str(NodeID)), utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
+        ClientThread.addQueue(msg, utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
         print "Sent {msg} to {dest}, system time is {time}".format(dest=dest_id, msg=msg, time=datetime.datetime.now().time().strftime("%H:%M:%S"))
 
     @staticmethod
@@ -196,15 +197,15 @@ class ClientThread (threading.Thread):
 
     @staticmethod
     def clientSideOutput():
-        print "Current requests: ", RequestQueue
+        print "Current requests: ", RequestQueue[0]
         if RequestQueue:
-            if RequestQueue[0].Cmd == "get":
+            if RequestQueue[0].cmd == "get":
                 pass
-            elif RequestQueue[0].Cmd == "insert":
-                print "Inserted key {key} value {value}".format(key=RequestQueue[0].Key, value=RequestQueue[0].Value)
-            elif RequestQueue[0].Cmd == "delete":
+            elif RequestQueue[0].cmd == "insert":
+                print "Inserted key {key} value {value}".format(key=RequestQueue[0].key, value=RequestQueue[0].value)
+            elif RequestQueue[0].cmd == "delete":
                 pass
-            elif RequestQueue[0].Cmd == "update":
+            elif RequestQueue[0].cmd == "update":
                 pass
             RequestQueue.pop(0)
 
