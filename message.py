@@ -60,8 +60,8 @@ class Request(Message):
 			)
 
 class ValueResponse(Message):
-	def __init__(self, value):
-		Message.__init__(self, value_timestamp_pair)
+	def __init__(self, value_timestamp_pair):
+		Message.__init__(self, "Value")
 		self.value = int(value_timestamp_pair['value'])
 		self.timestamp = value_timestamp_pair['timestamp']
 		self.type = "ValueResponse"

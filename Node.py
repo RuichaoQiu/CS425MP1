@@ -59,8 +59,9 @@ class ServerThread (threading.Thread):
 
     #msg is json string
     def processMsg(self, msg):
-        #print "receive msg: ", msg 
+        print "receive msg: ", msg 
         msg_decoded = yaml.load(msg)
+        print "then sender is ", msg_decoded['sender']
         if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
             if msg_decoded['type'] == configure.ACK_MSG:       # 1.1: receive ack 
                 ClientThread.clientSideOutput("")
@@ -78,12 +79,21 @@ class ServerThread (threading.Thread):
             else:                                   # 1.3: receive read result
                 pass
         else:                                   # 2: receive from peer nodes
+            print "receive from peers!"
+            sender_peer = msg_decoded['sender']
+            print msg_decoded['type']
             if msg_decoded['type'] == configure.ACK_MSG:       # 2.1: receive ack 
                 pass
             elif msg_decoded['type'] == "request":           # 2.2: receive peer request
-                pass
-            else:                                   # 2.3: receive read result
-                pass
+                if msg_decoded['cmd'] == 'get':
+                    value_timestamp = self.kvStore[msg_decoded['key']]
+                    value_msg = message.ValueResponse(value_timestamp)
+                    value_msg.signName(NodeID)
+                    json_str = json.dumps(value_msg, cls=message.MessageEncoder)
+                    ClientThread.sendMsg(json_str, sender_peer)
+            elif msg_decoded['type'] == 'ValueResponse':                               # 2.3: receive read result
+                ClientThread.clientSideOutput(msg_decoded['value'])
+                
 
     #msg is dict decoded from json string
     def executeRequest(self, msg): #msg: "cmd key (value) model", no source_id
@@ -145,7 +155,9 @@ class ClientThread (threading.Thread):
                         msg = json.dumps(request, cls=message.MessageEncoder)
                         ClientThread.sendMsg(msg, NUM_NODES) #send request to coordinator
                     elif model == 2:
-                        pass
+                        request.signName(NodeID)
+                        msg = json.dumps(request, cls=message.MessageEncoder)
+                        ClientThread.sendMsg(msg, NodeID)
                     elif model == 3:
                         pass
                     elif model == 4:
@@ -204,7 +216,6 @@ class ClientThread (threading.Thread):
         if RequestQueue:
             if RequestQueue[0].cmd == "get":
                 if RequestQueue[0].model in [1,2]:
-                    #pass #TODO
                     print "client side: get({key}) = {value}".format(key=RequestQueue[0].key, value=option_value)
                 else:
                     pass
@@ -233,6 +244,7 @@ class ChannelThread (threading.Thread):
             CurTime = datetime.datetime.now()
             for si in xrange(NUM_NODES+1):
                 while MessageQueues[si] and MessageQueues[si][0][0] <= CurTime:
+                    print "haha sending!"
                     ClientSockets[si].send(MessageQueues[si][0][1])
                     MessageQueues[si].pop(0)
             time.sleep(0.1)

@@ -25,7 +25,7 @@ class ServerThread (threading.Thread):
 def RunServer():
     CONNECTION_LIST = []
     RECV_BUFFER = 4096 
-    PORT = configure.GetPortNumber(sys.argv[1])
+    PORT = configure.GetNodePortNumber(sys.argv[1])
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind(("0.0.0.0", PORT))
@@ -41,7 +41,7 @@ def RunServer():
                 try:
                     data = sock.recv(RECV_BUFFER)
                     tmpl = data.split()
-                    print "Received "+" ".join(tmpl[:-1])+" from "+tmpl[-1]+", Max delay is "+str(configure.GetDelay(ord(tmpl[-1][0])-ord('A'),ord(sys.argv[1][0])-ord('A')))+"s, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
+                    print "Received "+" ".join(tmpl[:-1])+" from "+tmpl[-1]+", Max delay is "+str(configure.GetNodeDelay(sys.argv[1][0]))+"s, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
                 except:
                     sock.close()
                     CONNECTION_LIST.remove(sock)
@@ -68,12 +68,12 @@ def RunClient():
             x = ord(sys.argv[1][0])-ord('A')
             y = ord(l[-1])-ord('A')
             if not ConnectFlag[x][y]:
-                s[y].connect(("localhost", configure.GetPortNumber(l[-1])))
+                s[y].connect(("localhost", configure.GetNodePortNumber(l[-1])))
                 ConnectFlag[x][y] = True
             l = l[1:len(l)-1]
             l.append(sys.argv[1])
             tmpstr = " ".join(l)
-            AddQueue(tmpstr,GenerateRandomDelay(configure.GetDelay(x,y)),y)
+            AddQueue(tmpstr,GenerateRandomDelay(configure.GetNodeDelay(l[-1])),y)
             print "Sent "+ " ".join(l[:len(l)-1])+" to "+chr(y+ord('A'))+", system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
 
 def GenerateRandomDelay(x):
