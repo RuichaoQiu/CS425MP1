@@ -17,6 +17,7 @@ ClientSockets = utils.CreateClientSockets(NUM_NODES + 1)
 MessageQueues = utils.CreateMessageQueues(NUM_NODES + 1)
 RequestQueue = [] #Request object
 ValueFromDiffNodes = []
+AckCnt = 0
 
 def IsCmdValid(cmd):
     return cmd in configure.Commands
@@ -79,9 +80,19 @@ class ServerThread (threading.Thread):
                 ClientThread.clientSideOutput(self.kvStore[key]['value'])
         else:                                   # 2: receive from peer nodes
             print "receive from peers!"
+            global RequestQueue
             sender_peer = msg_decoded['sender']
             if msg_decoded['type'] == configure.ACK_MSG:       # 2.1: receive ack 
-                ClientThread.clientSideOutput("")
+                #print "let's see request queue", len(RequestQueue), RequestQueue[0], RequestQueue[0].model
+                if RequestQueue and RequestQueue[0].model != 4:
+                    ClientThread.clientSideOutput("")
+                else:
+                    global AckCnt
+                    AckCnt += 1
+                    #print "AckCnt: ", AckCnt
+                    if AckCnt == 2:
+                        ClientThread.clientSideOutput("")
+                        AckCnt = 0
             elif msg_decoded['type'] == "request":           # 2.2: receive peer request
                 self.executeRequest(msg_decoded)
                 if msg_decoded['cmd'] == 'get':
@@ -96,7 +107,6 @@ class ServerThread (threading.Thread):
                     json_str = json.dumps(ack_msg, cls=message.MessageEncoder)
                     ClientThread.sendMsg(json_str, sender_peer)
             elif msg_decoded['type'] == 'ValueResponse':                               # 2.3: receive read result
-                global RequestQueue
                 if RequestQueue and RequestQueue[0].model != 4:     
                     ClientThread.clientSideOutput(msg_decoded['value'])
                 else:
@@ -107,7 +117,6 @@ class ServerThread (threading.Thread):
                             latest_value = ValueFromDiffNodes[0][0]
                         else:
                             latest_value = ValueFromDiffNodes[1][0]
-                        print "latest_value: ", latest_value
                         ClientThread.clientSideOutput(latest_value)
                         ValueFromDiffNodes[:] = []
 
@@ -195,7 +204,11 @@ class ClientThread (threading.Thread):
                         msg = json.dumps(request, cls=message.MessageEncoder)
                         ClientThread.sendMsg(msg, NodeID)
                     elif model == 4:
-                        pass
+                        request.signTime()
+                        request.signName(NodeID)
+                        msg = json.dumps(request, cls=message.MessageEncoder)
+                        ClientThread.sendMsg(msg, NodeID)
+                        ClientThread.sendMsg(msg, utils.GenerateRandomPeer(NUM_NODES, NodeID))
                 elif request.cmd == "delete":
                     if model == 1:
                         pass
@@ -226,7 +239,7 @@ class ClientThread (threading.Thread):
 
     @staticmethod
     def clientSideOutput(option_value):
-        #print "Current requests: ", RequestQueue[0]
+        print "Current requests: ", RequestQueue[0]
         if RequestQueue:
             if RequestQueue[0].cmd == "get":
                 print "client side: get({key}) = {value}".format(key=RequestQueue[0].key, value=option_value)           
