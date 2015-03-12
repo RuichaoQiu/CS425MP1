@@ -45,9 +45,8 @@ class ServerThread (threading.Thread):
                 else:
                     try:
                         msg = read_socket.recv(RECV_BUFFER)
-                        print "receive msg: ", msg
+                        #print "receive msg: ", msg
                         self.processMsg(msg)
-                    #print "Received "+" ".join(tmpl[:-1])+" from "+tmpl[-1]+", Max delay is "+str(configure.GetCoodDelay())+"s, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
                     except:
                         CONNECTION_LIST.remove(read_socket)
                         read_socket.close()
@@ -60,17 +59,17 @@ class ServerThread (threading.Thread):
         global AckFlags
         if decoded_msg['type'] in ["ack", "ValueResponse"]:
             AckFlags[decoded_msg['sender']] = True
-            print AckFlags
+            #print AckFlags
         elif decoded_msg['type'] == "request":
-            print "caching request from ",decoded_msg['sender']
+            #print "caching request from ",decoded_msg['sender']
             self.cacheRequest(msg, decoded_msg['sender'])
     
     def cacheRequest(self, request, sender):
         global RequestPool
         global AckFlags
-        print "old pool:", RequestPool
+        #print "old pool:", RequestPool
         RequestPool.append([request, sender])
-        print "new pool:", RequestPool
+        #print "new pool:", RequestPool
 
 class ClientThread(threading.Thread):
     def __init__(self, threadID, name):
@@ -89,14 +88,14 @@ class ClientThread(threading.Thread):
             if RequestPool:
                 if BroadcastFlag:
                     if self.readyForNextRequest():
-                        print "sending ack back to the issue client ", RequestPool[0][1]
+                        #print "sending ack back to the issue client ", RequestPool[0][1]
                         ack_msg = message.Message("ack")
                         ack_msg.signName(NUM_NODES)
                         self.unicast(json.dumps(ack_msg, cls=message.MessageEncoder), RequestPool[0][1])
                         RequestPool.pop(0)
                         BroadcastFlag = False
                 else:
-                    print "My client thread will broadcast this request: ", RequestPool[0]
+                    #print "My client thread will broadcast this request: ", RequestPool[0]
                     BroadcastFlag = True
                     self.resetAckFlags()
                     self.broadcast(message.signNameForJsonStr(RequestPool[0][0], NUM_NODES))
@@ -121,8 +120,7 @@ class ClientThread(threading.Thread):
     #msg is json string format
     def unicast(self, msg, dest_id):
         global ClientSockets
-        print "sending {msg} to {dest}".format(msg=msg, dest=dest_id)
-        #node_name = chr(ord('A') + dest_id)
+        #print "sending {msg} to {dest}".format(msg=msg, dest=dest_id)
         if not OutConnectFlags[dest_id]:
             ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
             OutConnectFlags[dest_id] = True

@@ -1,15 +1,8 @@
-#sample msg:
-#cmd insert key value model (time) (source)
-#cmd update key value model (time) (source)
-#cmd delete key		  model (time) (source)
-#cmd get key		  model (time) (source)
-#ack ack (source)
-#result value (time) (source)
 import datetime
 import json
-import yaml
 from json import JSONEncoder
-from json import JSONDecoder
+import yaml
+
 import configure
 
 class Message(object):
@@ -87,13 +80,3 @@ def signNameForJsonStr(json_msg_str, name):
 def isRead(json_msg_str):
 	decoded_msg = yaml.load(json_msg_str)
 	return decoded_msg['cmd'] == 'get'
-
-'''request = Request("insert 1 2 3")
-json_str = json.dumps(request, cls=MessageEncoder)
-x = yaml.load(json_str)
-x['sender'] = 3
-new_json_str = json.dumps(x)
-print new_json_str'''
-
-
-

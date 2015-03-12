@@ -59,10 +59,10 @@ class ServerThread (threading.Thread):
 
     #msg is json string
     def processMsg(self, msg):
-        print "receive msg: ", msg 
+        #print "receive msg: ", msg 
         msg_decoded = yaml.load(msg)
         if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
-            print "receive msg from coordinator"
+            #print "receive msg from coordinator"
             if msg_decoded['type'] == configure.ACK_MSG:       # 1.1: receive ack 
                 ClientThread.clientSideOutput("")
             elif msg_decoded['type'] == "request":         # 1.2: receive broadcast request
@@ -79,7 +79,7 @@ class ServerThread (threading.Thread):
                 key = msg_decoded['key']
                 ClientThread.clientSideOutput(self.kvStore[key]['value'])
         else:                                   # 2: receive from peer nodes
-            print "receive msg from peers!"
+            #print "receive msg from peers!"
             global RequestQueue
             sender_peer = msg_decoded['sender']
             if msg_decoded['type'] == configure.ACK_MSG:       # 2.1: receive ack 
@@ -111,7 +111,7 @@ class ServerThread (threading.Thread):
                     ClientThread.clientSideOutput(msg_decoded['value'])
                 else:
                     ValueFromDiffNodes.append([msg_decoded['value'], msg_decoded['timestamp']])
-                    print ValueFromDiffNodes
+                    #print ValueFromDiffNodes
                     if len(ValueFromDiffNodes) == 2:
                         if utils.TimestampCmp(ValueFromDiffNodes[0][1], ValueFromDiffNodes[1][1]):
                             latest_value = ValueFromDiffNodes[0][0]
@@ -219,11 +219,10 @@ class ClientThread (threading.Thread):
     def sendMsg(msg, dest_id):
         global ClientSockets
         if not ClientThread.outConnectFlags[dest_id]:
-            print "build connect with ", dest_id
+            #print "build connect with ", dest_id
             ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
             ClientThread.outConnectFlags[dest_id] = True
         ClientThread.addQueue(msg, utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
-        #print "Sent {msg} to {dest}, system time is {time}".format(dest=dest_id, msg=msg, time=datetime.datetime.now().time().strftime("%H:%M:%S"))
 
     @staticmethod
     def addQueue(messagestr,delaynum, dest_id):
