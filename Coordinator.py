@@ -59,9 +59,9 @@ class ServerThread (threading.Thread):
         global AckFlags
         if decoded_msg['type'] in ["ack", "ValueResponse"]:
             AckFlags[decoded_msg['sender']] = True
-            #print AckFlags
+            print AckFlags
         elif decoded_msg['type'] == "request":
-            #print "caching request from ",decoded_msg['sender']
+            print "caching request from ",decoded_msg['sender']
             self.cacheRequest(msg, decoded_msg['sender'])
     
     def cacheRequest(self, request, sender):
@@ -86,6 +86,7 @@ class ClientThread(threading.Thread):
         global BroadcastFlag 
         while 1:
             if RequestPool:
+                #print BroadcastFlag
                 if BroadcastFlag:
                     if self.readyForNextRequest():
                         #print "sending ack back to the issue client ", RequestPool[0][1]
@@ -95,7 +96,7 @@ class ClientThread(threading.Thread):
                         RequestPool.pop(0)
                         BroadcastFlag = False
                 else:
-                    #print "My client thread will broadcast this request: ", RequestPool[0]
+                    print "My client thread will broadcast this request: ", RequestPool[0]
                     BroadcastFlag = True
                     self.resetAckFlags()
                     self.broadcast(message.signNameForJsonStr(RequestPool[0][0], NUM_NODES))
@@ -120,7 +121,7 @@ class ClientThread(threading.Thread):
     #msg is json string format
     def unicast(self, msg, dest_id):
         global ClientSockets
-        #print "sending {msg} to {dest}".format(msg=msg, dest=dest_id)
+        print "sending {msg} to {dest}".format(msg=msg, dest=dest_id)
         if not OutConnectFlags[dest_id]:
             ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
             OutConnectFlags[dest_id] = True

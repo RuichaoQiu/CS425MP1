@@ -66,11 +66,15 @@ class ServerThread (threading.Thread):
             if msg_decoded['type'] == configure.ACK_MSG:       # 1.1: receive ack 
                 ClientThread.clientSideOutput("")
             elif msg_decoded['type'] == "request":         # 1.2: receive broadcast request
-                self.executeRequest(msg_decoded)
-                if msg_decoded['cmd'] == "get": #read, return value
-                    key = msg_decoded['key']
-                    if msg_decoded['original_sender'] == NodeID:
-                        ClientThread.clientSideOutput(self.kvStore[key]['value'])
+                print "receive request from coordinator!"
+                if self.executeRequest(msg_decoded):
+                    if msg_decoded['cmd'] == "get": #read, return value
+                        print "client output stage..."
+                        key = msg_decoded['key']
+                        if msg_decoded['original_sender'] == NodeID:
+                            print "on going..."
+                            ClientThread.clientSideOutput(self.kvStore[key]['value'])
+                print "sending ack to coordinator!"
                 ack_msg = message.Message("ack")
                 ack_msg.signName(NodeID)
                 json_str = json.dumps(ack_msg, cls=message.MessageEncoder)
@@ -130,6 +134,8 @@ class ServerThread (threading.Thread):
             if self.validateKey(key):
                 del self.kvStore[key]
                 print "Key {key} deleted".format(key=key)
+            else:
+                return False
         elif msg['cmd'] == "update":
             if self.validateKey(key):
                 old_value = self.kvStore[key]['value']
@@ -140,10 +146,15 @@ class ServerThread (threading.Thread):
         elif msg['cmd'] == "get":
             if self.validateKey(key):
                 print "get({key}) = {value}".format(key=key, value=self.kvStore[key]['value'])
+            else:
+                return False
+        return True
 
     def validateKey(self, key):
         if not key in self.kvStore:
             print "Key {key} does not exist!".format(key=key)
+            if RequestQueue:
+                RequestQueue.pop(0)
             return False
         return True
 
