@@ -19,6 +19,7 @@ RequestQueue = [] #Request object
 ValueFromDiffNodes = []
 AckCnt = 0 #used for model 4
 ReadyForNextRequest = True
+RequestCompleteTimestamp = 0
 
 def IsCmdValid(cmd):
     return cmd in configure.Commands
@@ -243,6 +244,8 @@ class ClientThread (threading.Thread):
             ReadyForNextRequest = True
             #print"turn flag!:", ReadyForNextRequest
             RequestQueue.pop(0)
+            global RequestCompleteTimestamp
+            RequestCompleteTimestamp = timestamp
 
 class RequestThread(threading.Thread):
     def __init__(self, threadID, name):
