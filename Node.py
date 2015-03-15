@@ -141,10 +141,11 @@ class ServerThread (threading.Thread):
                 else:
                     global ValueFromDiffNodes
                     ValueFromDiffNodes.append(value_ts)
-                    #print ValueFromDiffNodes
                     if len(ValueFromDiffNodes) == 2:
-                        #print "now i have two candidates..."
-                        print ""
+                        print "Candidate values are:"
+                        for candidate in ValueFromDiffNodes:
+                            print candidate['value'], candidate['timestamp']
+
                         if utils.TimestampCmp(ValueFromDiffNodes[0]['timestamp'], ValueFromDiffNodes[1]['timestamp']):
                             latest_pair = ValueFromDiffNodes[0]
                         else:
@@ -156,6 +157,7 @@ class ServerThread (threading.Thread):
     #msg is dict decoded from json string
     def executeRequest(self, msg):
         key = msg['key']
+        print type(key)
         if msg['cmd'] == "insert":
             self.kvStore[key] = {'timestamp':msg['time'], 'value':int(msg['value'])}
             print "Inserted key {key} value {value}".format(key=key, value=self.kvStore[key]['value'])
