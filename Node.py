@@ -61,8 +61,10 @@ class ServerThread (threading.Thread):
     def processMsg(self, msg):
         #print "receive msg: ", msg 
         if msg == "show-all":
-            print "I am server. I am going to show - all!"
+            #print "I am server. I am going to show - all!"
             self.showAll()
+            return
+
         msg_decoded = yaml.load(msg)
         if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
             #print "receive msg from coordinator"
@@ -184,18 +186,24 @@ class ClientThread (threading.Thread):
             read_sockets, write_sockets, error_sockets = select.select(socket_list , [], []) 
             for sock in read_sockets:
                 cmdline_input = sys.stdin.readline()
+
+                # utility tool: show-all
                 if cmdline_input.strip() == "show-all":
-                    print "going to tell server to print out all <key,value> pairs..."
+                    #print "going to tell server to print out all <key,value> pairs..."
                     ClientThread.sendMsg("show-all", NodeID)
                     break
 
-                request = message.Request(cmdline_input)
-                
+                # utility tool: search key
+                if cmdline_input.strip()[0] == "search":
+                    for i in xrange(NUM_NODES):
+                        ClientThread.sendMsg(cmdline_input.strip(), i)
+
+                # replica operation: insert/delete/update/get...
+                request = message.Request(cmdline_input)            
                 if not IsCmdValid(request.cmd):
                     print "Invalid command!"
                     #TODO: print out help menu
                     break
-
                 model = request.model
                 RequestQueue.append(request)
                 if request.cmd == "get":
