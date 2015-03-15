@@ -74,12 +74,14 @@ class ServerThread (threading.Thread):
         
         if "cmd" in msg_decoded and msg_decoded["cmd"] == "repair":
             print "why here? %s" % (msg_decoded["cmd"])
-            if 1 in msg_decoded:
-                print "haha %d" % (msg_decoded[1])
+            if "1" in msg_decoded:
+                print "haha %d" % (msg_decoded["1"])
             else:
                 print "OH NO"
-            self.kvStore = copy.deepcopy(msg_decoded)
-            del self.kvStore["cmd"]
+            self.kvStore = {}
+            for keys in msg_decoded:
+                if keys != "cmd":
+                    self.kvStore[int(keys)] = msg_decoded[keys]
             return
 
         if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
