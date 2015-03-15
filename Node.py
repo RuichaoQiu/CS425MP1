@@ -22,6 +22,8 @@ AckCnt = 0 #used for model 4
 ReadyForNextRequest = True
 RequestCompleteTimestamp = 0
 DelayTime = 0.0
+SearchResult = [[] for si in xrange(NUM_NODES)]
+ResultCount = 0
 
 def IsCmdValid(cmd):
     return cmd in configure.Commands
@@ -69,6 +71,29 @@ class ServerThread (threading.Thread):
             self.showAll()
             return
 
+        if msg[:6] == "search":
+            strlist = msg.split()
+            if int(strlist[1]) not in self.kvStore:
+                tmpch = "#"
+            else:
+                tmpch = str(self.kvStore[int(strlist[1])]['value'])
+            ClientThread.sendMsg("fetch "+strlist[1]+" "+tmpch+" "+str(NodeID),int(strlist[2]))
+            return
+
+        if msg[:5] == "fetch":
+            strlist = msg.split()
+            global SearchResult
+            global ResultCount
+            ResultCount += 1
+            SearchResult[int(strlist[-1])] = [strlist[1],strlist[2]]
+            if ResultCount == NUM_NODES:
+                for i in xrange(NUM_NODES):
+                    ch = chr(i+ord("A"))
+                    print "Server %s: <%s, %s>" % (ch,SearchResult[i][0],SearchResult[i][1])
+                ResultCount = 0
+            return
+
+
         msg_decoded = yaml.load(msg)
         # Finish inconsistency repair
         
@@ -81,7 +106,7 @@ class ServerThread (threading.Thread):
             self.kvStore = {}
             for keys in msg_decoded:
                 if keys != "cmd":
-                    self.kvStore[int(keys)] = msg_decoded[keys]
+                    self.kvStore[int(keys)] = {'timestamp':datetime.datetime.now(), 'value':int(msg_decoded[keys])}
             return
 
         if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
@@ -229,9 +254,10 @@ class ClientThread (threading.Thread):
                     break
 
                 # utility tool: search key
-                if cmdline_input.strip()[0] == "search":
+                if cmdline_input.strip()[:6] == "search":
                     for i in xrange(NUM_NODES):
-                        ClientThread.sendMsg(cmdline_input.strip(), i)
+                        ClientThread.sendMsg(cmdline_input.strip()+" "+str(NodeID), i)
+                    break
 
                 # replica operation: insert/delete/update/get...
                 request = message.Request(cmdline_input)            

@@ -86,6 +86,7 @@ class ServerThread (threading.Thread):
         elif msg['cmd'] == "update":
             if key in kvStore:
                 kvStore[key] = int(msg['value'])
+            print "Update %d %d" % (key, kvStore[key])
 
 class ClientThread(threading.Thread):
     def __init__(self, threadID, name):
@@ -189,17 +190,13 @@ class RepairThread (threading.Thread):
             msg = json.dumps(req, cls=message.MessageEncoder)
             RequestPool.append([msg,"repair"])
             decoded_msg = yaml.load(msg)
-            if "1" in decoded_msg:
-                print "oh yes %d" % (decoded_msg["1"])
-            else:
-                print "nonono"
 
 def main():
     threads = []
     threads.append(ServerThread(1, "ServerThread"))
     threads.append(ClientThread(2, "ClientThread"))
     threads.append(ChannelThread(3, "ChannelThread"))
-    threads.append(RepairThread(4,"RepairThread"))
+    #threads.append(RepairThread(4,"RepairThread"))
 
     for thread in threads:
         thread.start()

@@ -59,10 +59,6 @@ class Repair(Message):
 		self.kvStore["cmd"] = "repair"
 
 	def __json__(self):
-		if 1 in self.kvStore:
-			print "Oh Yes"
-		else:
-			print "eheheh"
 		return self.kvStore
 
 
