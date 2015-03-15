@@ -16,6 +16,8 @@ RequestPool= [] #[request, sender]
 BroadcastFlag = False
 AckFlags = [True for i in range(NUM_NODES)]
 
+kvStore = {}
+
 ClientSockets = utils.CreateClientSockets(NUM_NODES)
 
 class ServerThread (threading.Thread):
@@ -62,14 +64,26 @@ class ServerThread (threading.Thread):
             print AckFlags
         elif decoded_msg['type'] == "request":
             print "caching request from ",decoded_msg['sender']
-            self.cacheRequest(msg, decoded_msg['sender'])
+            self.cacheRequest(msg, decoded_msg['sender'], decoded_msg)
     
-    def cacheRequest(self, request, sender):
+    def cacheRequest(self, request, sender, msg):
         global RequestPool
         global AckFlags
+        global kvStore
         #print "old pool:", RequestPool
         RequestPool.append([request, sender])
         #print "new pool:", RequestPool
+
+        #Store key - value
+        key = msg['key']
+        if msg['cmd'] == "insert":
+            kvStore[key] = int(msg['value'])
+        elif msg['cmd'] == "delete":
+            if key in kvStore:
+                del kvStore[key]
+        elif msg['cmd'] == "update":
+            if key in kvStore:
+                kvStore[key] = int(msg['value'])
 
 class ClientThread(threading.Thread):
     def __init__(self, threadID, name):
