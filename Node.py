@@ -204,6 +204,7 @@ class ClientThread (threading.Thread):
                     print "Invalid command!"
                     #TODO: print out help menu
                     break
+                print "Received request {request} at {timestamp}".format(request=cmdline_input.strip(), timestamp=datetime.datetime.now().time().strftime("%H:%M:%S"))
                 model = request.model
                 RequestQueue.append(request)
                 if request.cmd == "get":
@@ -267,14 +268,15 @@ class ClientThread (threading.Thread):
     def clientSideOutput(option_value):
         #print "Current requests: ", RequestQueue[0]
         if RequestQueue:
+            timestamp = datetime.datetime.now().time().strftime("%H:%M:%S")
             if RequestQueue[0].cmd == "get":
-                print "client side: get({key}) = {value}".format(key=RequestQueue[0].key, value=option_value)           
+                print "client side: get({key}) = {value} at {time}".format(key=RequestQueue[0].key, value=option_value, time=timestamp)           
             elif RequestQueue[0].cmd == "insert":
-                print "client side: Inserted key {key} value {value}".format(key=RequestQueue[0].key, value=RequestQueue[0].value)
+                print "client side: Inserted key {key} value {value} at {time}".format(key=RequestQueue[0].key, value=RequestQueue[0].value, time=timestamp)
             elif RequestQueue[0].cmd == "delete":
-                print "client side: Key {key} deleted.".format(key=RequestQueue[0].key)
+                print "client side: Key {key} deleted at {time}".format(key=RequestQueue[0].key, time=timestamp)
             elif RequestQueue[0].cmd == "update":
-                print "client side: Key {key} updated to {value}".format(key=RequestQueue[0].key, value=RequestQueue[0].value)
+                print "client side: Key {key} updated to {value} at {time}".format(key=RequestQueue[0].key, value=RequestQueue[0].value, time=timestamp)
             RequestQueue.pop(0)
 
 
