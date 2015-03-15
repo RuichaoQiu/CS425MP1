@@ -250,7 +250,7 @@ class ClientThread (threading.Thread):
             #print "build connect with ", dest_id
             ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
             ClientThread.outConnectFlags[dest_id] = True
-        ClientThread.addQueue(msg, utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
+        ClientThread.addQueue(msg, utils.GenerateRandomDelay(configure.DelayList[dest_id][NodeID]), dest_id)
 
     @staticmethod
     def addQueue(messagestr,delaynum, dest_id):

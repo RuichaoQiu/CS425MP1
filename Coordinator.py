@@ -144,7 +144,7 @@ class ClientThread(threading.Thread):
         if not OutConnectFlags[dest_id]:
             ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
             OutConnectFlags[dest_id] = True
-        ClientThread.addQueue(msg, utils.GenerateRandomDelay(configure.DelayList[dest_id]), dest_id)
+        ClientThread.addQueue(msg, utils.GenerateRandomDelay(configure.DelayList[dest_id][NUM_NODES]), dest_id)
 
     @staticmethod
     def addQueue(messagestr,delaynum,dest):
