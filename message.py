@@ -59,6 +59,10 @@ class Repair(Message):
 		self.kvStore["cmd"] = "repair"
 
 	def __json__(self):
+		if 1 in self.kvStore:
+			print "Oh Yes"
+		else:
+			print "eheheh"
 		return self.kvStore
 
 
@@ -83,8 +87,9 @@ class MessageEncoder(JSONEncoder):
 
 def signNameForJsonStr(json_msg_str, name):
 	decoded_msg = yaml.load(json_msg_str)
-	decoded_msg['original_sender'] = decoded_msg['sender']
-	decoded_msg['sender'] = int(name)
+	if "sender" in decoded_msg:
+		decoded_msg['original_sender'] = decoded_msg['sender']
+		decoded_msg['sender'] = int(name)
 	return json.dumps(decoded_msg)
 
 def isRead(json_msg_str):
