@@ -239,8 +239,9 @@ class ClientThread (threading.Thread):
                 print "client side: Key {key} deleted at {time}".format(key=RequestQueue[0].key, time=timestamp)
             elif RequestQueue[0].cmd == "update":
                 print "client side: Key {key} updated to {value} at {time}".format(key=RequestQueue[0].key, value=RequestQueue[0].value, time=timestamp)
+            global ReadyForNextRequest
             ReadyForNextRequest = True
-            print"turn flag!:", ReadyForNextRequest
+            #print"turn flag!:", ReadyForNextRequest
             RequestQueue.pop(0)
 
 class RequestThread(threading.Thread):
@@ -259,7 +260,7 @@ class RequestThread(threading.Thread):
             if ReadyForNextRequest:
                 if RequestQueue:
                     ReadyForNextRequest = False
-                    print "turn flag to false :("
+                    #print "turn flag to false :("
                     self.handleRequest(RequestQueue[0])
             time.sleep(0.1)
 
