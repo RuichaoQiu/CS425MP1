@@ -38,8 +38,7 @@ class Request(Message):
 			self.value = int(components[2])
 		else:
 			self.value = ""
-		if self.cmd in ["insert", "update","delete","get"]
-			self.model = int(components[-1])
+		self.model = int(components[-1])
 		self.type = "request"
 
 	def __json__(self):
