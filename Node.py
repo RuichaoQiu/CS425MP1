@@ -131,6 +131,7 @@ class ServerThread (threading.Thread):
                     #print ValueFromDiffNodes
                     if len(ValueFromDiffNodes) == 2:
                         #print "now i have two candidates..."
+                        print ""
                         if utils.TimestampCmp(ValueFromDiffNodes[0]['timestamp'], ValueFromDiffNodes[1]['timestamp']):
                             latest_pair = ValueFromDiffNodes[0]
                         else:
@@ -224,7 +225,7 @@ class ClientThread (threading.Thread):
 
                 print "Received request {request} at {timestamp}".format(request=cmdline_input.strip(), timestamp=datetime.datetime.now().time().strftime("%H:%M:%S"))
                 RequestQueue.append(request)
-                print len(RequestQueue), ReadyForNextRequest
+                #print len(RequestQueue), ReadyForNextRequest
 
     @staticmethod
     #msg is json string
@@ -251,8 +252,6 @@ class ClientThread (threading.Thread):
                 if RequestQueue[0].model in [1,2]:
                     print "client side: get({key}) = {value} at {time}".format(key=RequestQueue[0].key, value=option_value_ts['value'], time=timestamp) 
                 else: #evantual consistency models
-                    print "output for eventual model..."
-                    print option_value_ts
                     print "client side: get({key}) = ({value}, {ts}) at {time}".format(key=RequestQueue[0].key, value=option_value_ts['value'], ts=option_value_ts['timestamp'], time=timestamp)            
             elif RequestQueue[0].cmd == "insert":
                 print "client side: Inserted key {key} value {value} at {time}".format(key=RequestQueue[0].key, value=RequestQueue[0].value, time=timestamp)
