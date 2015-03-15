@@ -93,21 +93,31 @@ class ServerThread (threading.Thread):
                 ResultCount = 0
             return
 
+        if msg[:6] == "repair":
+            strlist = msg.split()
+            if int(strlist[1]) not in self.kvStore:
+                tmpch = "#"
+                tmptime = "#"
+            else:
+                tmpch = str(self.kvStore[int(strlist[1])]['value'])
+                tmptime = self.kvStore[int(strlist[1])]['timestamp']
+            ClientThread.sendMsg("achieve "+strlist[1]+" "+tmpch+" "+tmptime,int(strlist[2]))
+            return
+
+        if msg[:7] == "achieve":
+            strlist = msg.split()
+            if strlist[2] != "#":
+                if int(strlist[1]) not in self.kvStore:
+                    self.kvStore[int(strlist[1])]['value'] = strlist[2]
+                    self.kvStore[int(strlist[1])]['timestamp'] = strlist[3]
+                elif utils.TimestampCmp(strlist[3], self.kvStore[int(strlist[1])]['timestamp']):
+                    self.kvStore[int(strlist[1])]['value'] = strlist[2]
+                    self.kvStore[int(strlist[1])]['timestamp'] = strlist[3]
+            return
+
 
         msg_decoded = yaml.load(msg)
         # Finish inconsistency repair
-        
-        if "cmd" in msg_decoded and msg_decoded["cmd"] == "repair":
-            print "why here? %s" % (msg_decoded["cmd"])
-            if "1" in msg_decoded:
-                print "haha %d" % (msg_decoded["1"])
-            else:
-                print "OH NO"
-            self.kvStore = {}
-            for keys in msg_decoded:
-                if keys != "cmd":
-                    self.kvStore[int(keys)] = {'timestamp':datetime.datetime.now(), 'value':int(msg_decoded[keys])}
-            return
 
         if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
             #print "receive msg from coordinator"
@@ -308,6 +318,12 @@ class ClientThread (threading.Thread):
             global RequestCompleteTimestamp
             RequestCompleteTimestamp = datetime.datetime.now()
 
+    @staticmethod
+    def InconsistencyRepair():
+        for i in xrange(NUM_NODES):
+            ClientThread.sendMsg("repair "+str(NodeID), i)
+
+
 class RequestThread(threading.Thread):
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
@@ -347,11 +363,13 @@ class RequestThread(threading.Thread):
                 request.signName(NodeID)
                 msg = json.dumps(request, cls=message.MessageEncoder)
                 ClientThread.sendMsg(msg, NodeID)
+                ClientThread.InconsistencyRepair()
             elif model == 4:
                 request.signName(NodeID)
                 msg = json.dumps(request, cls=message.MessageEncoder)
                 ClientThread.sendMsg(msg, NodeID)
                 ClientThread.sendMsg(msg, utils.GenerateRandomPeer(NUM_NODES, NodeID))
+                ClientThread.InconsistencyRepair()
         elif request.cmd == "insert" or request.cmd == "update":
             if model == 1 or model == 2:
                 request.signTime()

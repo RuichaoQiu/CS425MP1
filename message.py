@@ -56,7 +56,7 @@ class Request(Message):
 class Repair(Message):
 	def __init__(self,kv):
 		self.kvStore = copy.deepcopy(kv)
-		self.kvStore["cmd"] = "repair"
+		self.kvStore["cmd"] = "UpdateResult"
 
 	def __json__(self):
 		return self.kvStore
