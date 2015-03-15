@@ -20,6 +20,7 @@ ValueFromDiffNodes = []
 AckCnt = 0 #used for model 4
 ReadyForNextRequest = True
 RequestCompleteTimestamp = 0
+DelayTime = 0.0
 
 def IsCmdValid(cmd):
     return cmd in configure.Commands
@@ -196,6 +197,13 @@ class ClientThread (threading.Thread):
             for sock in read_sockets:
                 cmdline_input = sys.stdin.readline()
 
+                if cmdline_input.strip()[:5] == "delay":
+                    tmpstr = cmdline_input.strip()[6:]
+                    Ltmpstr = tmpstr.split()
+                    global DelayTime
+                    DelayTime = float(Ltmpstr[0])
+                    break
+
                 # utility tool: show-all
                 if cmdline_input.strip() == "show-all":
                     #print "going to tell server to print out all <key,value> pairs..."
@@ -256,7 +264,7 @@ class ClientThread (threading.Thread):
             ReadyForNextRequest = True
             RequestQueue.pop(0)
             global RequestCompleteTimestamp
-            RequestCompleteTimestamp = timestamp
+            RequestCompleteTimestamp = datetime.datetime.now()
 
 class RequestThread(threading.Thread):
     def __init__(self, threadID, name):
@@ -269,11 +277,15 @@ class RequestThread(threading.Thread):
 
     def update(self):
         global ReadyForNextRequest
+        global RequestCompleteTimestamp
+        global DelayTime
         while 1:
+            CurTime = datetime.datetime.now()
             #print ReadyForNextRequest
-            if ReadyForNextRequest:
+            if ReadyForNextRequest and (DelayTime == 0.0 or RequestCompleteTimestamp+datetime.timedelta(0,DelayTime) <= CurTime):
                 if RequestQueue:
                     ReadyForNextRequest = False
+                    DelayTime = 0.0
                     #print "turn flag to false :("
                     self.handleRequest(RequestQueue[0])
             time.sleep(0.1)
