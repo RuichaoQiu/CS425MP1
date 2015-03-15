@@ -189,8 +189,8 @@ class RepairThread (threading.Thread):
             msg = json.dumps(req, cls=message.MessageEncoder)
             RequestPool.append([msg,"repair"])
             decoded_msg = yaml.load(msg)
-            if 1 in decoded_msg:
-                print "oh yes %d" % (decoded_msg[1])
+            if "1" in decoded_msg:
+                print "oh yes %d" % (decoded_msg["1"])
             else:
                 print "nonono"
 
