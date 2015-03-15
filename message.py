@@ -4,6 +4,7 @@ from json import JSONEncoder
 import yaml
 
 import configure
+import copy
 
 class Message(object):
 	def __init__(self, contentStr):
@@ -51,6 +52,15 @@ class Request(Message):
 			sender=self.sender, \
 			time=self.time, \
 			)
+
+class Repair(Message):
+	def __init__(self,kv):
+		self.kvStore = copy.deepcopy(kv)
+		self.kvStore["cmd"] = "repair"
+
+	def __json__(self):
+		return self.kvStore
+
 
 class ValueResponse(Message):
 	def __init__(self, value_timestamp_pair):

@@ -15,6 +15,9 @@ MessageQueues = [[] for i in range(NUM_NODES)] #coordinator acts as client, send
 RequestPool= [] #[request, sender]
 BroadcastFlag = False
 AckFlags = [True for i in range(NUM_NODES)]
+DelayPeriod = 5
+
+kvStore = {}
 
 ClientSockets = utils.CreateClientSockets(NUM_NODES)
 
@@ -62,14 +65,26 @@ class ServerThread (threading.Thread):
             print AckFlags
         elif decoded_msg['type'] == "request":
             print "caching request from ",decoded_msg['sender']
-            self.cacheRequest(msg, decoded_msg['sender'])
+            self.cacheRequest(msg, decoded_msg['sender'], decoded_msg)
     
-    def cacheRequest(self, request, sender):
+    def cacheRequest(self, request, sender, msg):
         global RequestPool
         global AckFlags
+        global kvStore
         #print "old pool:", RequestPool
         RequestPool.append([request, sender])
         #print "new pool:", RequestPool
+
+        #Store key - value
+        key = msg['key']
+        if msg['cmd'] == "insert":
+            kvStore[key] = int(msg['value'])
+        elif msg['cmd'] == "delete":
+            if key in kvStore:
+                del kvStore[key]
+        elif msg['cmd'] == "update":
+            if key in kvStore:
+                kvStore[key] = int(msg['value'])
 
 class ClientThread(threading.Thread):
     def __init__(self, threadID, name):
@@ -88,7 +103,7 @@ class ClientThread(threading.Thread):
             if RequestPool:
                 #print BroadcastFlag
                 if BroadcastFlag:
-                    if self.readyForNextRequest():
+                    if self.readyForNextRequest() and RequestPool[0][1] != "repair":
                         #print "sending ack back to the issue client ", RequestPool[0][1]
                         ack_msg = message.Message("ack")
                         ack_msg.signName(NUM_NODES)
@@ -152,11 +167,30 @@ class ChannelThread (threading.Thread):
                     MessageQueues[si].pop(0)
             time.sleep(0.1)
 
+class RepairThread (threading.Thread):
+    def __init__(self, threadID, name):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.name = name
+
+    def run(self):
+        self.update()
+
+    def update(self):
+        global RequestPool
+        global kvStore
+        while 1:
+            time.sleep(DelayPeriod)
+            req = message.Repair(kvStore)
+            msg = json.dumps(req, cls=message.MessageEncoder)
+            RequestPool.append([msg,"repair"])
+
 def main():
     threads = []
     threads.append(ServerThread(1, "ServerThread"))
     threads.append(ClientThread(2, "ClientThread"))
     threads.append(ChannelThread(3, "ChannelThread"))
+    #threads.append(RepairThread(4,"RepairThread"))
 
     for thread in threads:
         thread.start()
