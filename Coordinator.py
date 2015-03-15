@@ -15,7 +15,7 @@ MessageQueues = [[] for i in range(NUM_NODES)] #coordinator acts as client, send
 RequestPool= [] #[request, sender]
 BroadcastFlag = False
 AckFlags = [True for i in range(NUM_NODES)]
-DelayPeriod = 5
+DelayPeriod = 15
 
 kvStore = {}
 
@@ -76,7 +76,8 @@ class ServerThread (threading.Thread):
         #print "new pool:", RequestPool
 
         #Store key - value
-        key = msg['key']
+        print "Get %s %s" % (msg['cmd'],msg['value'])
+        key = int(msg['key'])
         if msg['cmd'] == "insert":
             kvStore[key] = int(msg['value'])
         elif msg['cmd'] == "delete":
@@ -103,7 +104,10 @@ class ClientThread(threading.Thread):
             if RequestPool:
                 #print BroadcastFlag
                 if BroadcastFlag:
-                    if self.readyForNextRequest() and RequestPool[0][1] != "repair":
+                    if RequestPool[0][1] == "repair":
+                        RequestPool.pop(0)
+                        BroadcastFlag = False
+                    elif self.readyForNextRequest():
                         #print "sending ack back to the issue client ", RequestPool[0][1]
                         ack_msg = message.Message("ack")
                         ack_msg.signName(NUM_NODES)
@@ -184,13 +188,18 @@ class RepairThread (threading.Thread):
             req = message.Repair(kvStore)
             msg = json.dumps(req, cls=message.MessageEncoder)
             RequestPool.append([msg,"repair"])
+            decoded_msg = yaml.load(msg)
+            if 1 in decoded_msg:
+                print "oh yes %d" % (decoded_msg[1])
+            else:
+                print "nonono"
 
 def main():
     threads = []
     threads.append(ServerThread(1, "ServerThread"))
     threads.append(ClientThread(2, "ClientThread"))
     threads.append(ChannelThread(3, "ChannelThread"))
-    #threads.append(RepairThread(4,"RepairThread"))
+    threads.append(RepairThread(4,"RepairThread"))
 
     for thread in threads:
         thread.start()
