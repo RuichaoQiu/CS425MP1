@@ -60,6 +60,9 @@ class ServerThread (threading.Thread):
     #msg is json string
     def processMsg(self, msg):
         #print "receive msg: ", msg 
+        if msg == "show-all":
+            print "I am server. I am going to show - all!"
+            self.showAll()
         msg_decoded = yaml.load(msg)
         if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
             #print "receive msg from coordinator"
@@ -158,6 +161,11 @@ class ServerThread (threading.Thread):
             return False
         return True
 
+    def showAll(self):
+        for key, value in self.kvStore.items():
+            print "<{key}, {value}>".format(key=key, value=value['value'])
+
+
 class ClientThread (threading.Thread):
     outConnectFlags = [False for i in xrange(NUM_NODES + 1)]
 
@@ -175,7 +183,13 @@ class ClientThread (threading.Thread):
             socket_list = [sys.stdin]
             read_sockets, write_sockets, error_sockets = select.select(socket_list , [], []) 
             for sock in read_sockets:
-                request = message.Request(sys.stdin.readline())
+                cmdline_input = sys.stdin.readline()
+                if cmdline_input.strip() == "show-all":
+                    print "going to tell server to print out all <key,value> pairs..."
+                    ClientThread.sendMsg("show-all", NodeID)
+                    break
+
+                request = message.Request(cmdline_input)
                 
                 if not IsCmdValid(request.cmd):
                     print "Invalid command!"
