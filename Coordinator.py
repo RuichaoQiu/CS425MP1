@@ -15,6 +15,7 @@ MessageQueues = [[] for i in range(NUM_NODES)] #coordinator acts as client, send
 RequestPool= [] #[request, sender]
 BroadcastFlag = False
 AckFlags = [True for i in range(NUM_NODES)]
+DelayPeriod = 5
 
 kvStore = {}
 
@@ -102,7 +103,7 @@ class ClientThread(threading.Thread):
             if RequestPool:
                 #print BroadcastFlag
                 if BroadcastFlag:
-                    if self.readyForNextRequest():
+                    if self.readyForNextRequest() and RequestPool[0][1] != "repair":
                         #print "sending ack back to the issue client ", RequestPool[0][1]
                         ack_msg = message.Message("ack")
                         ack_msg.signName(NUM_NODES)
@@ -166,11 +167,29 @@ class ChannelThread (threading.Thread):
                     MessageQueues[si].pop(0)
             time.sleep(0.1)
 
+class RepairThread (threading.Thread):
+    def __init__(self, threadID, name):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.name = name
+
+    def run(self):
+        self.update()
+
+    def update(self):
+        global RequestPool
+        while 1:
+            time.sleep(DelayPeriod)
+            req = message.Repair()
+            msg = json.dumps(req, cls=message.MessageEncoder)
+            RequestPool.append([msg,"repair"])
+
 def main():
     threads = []
     threads.append(ServerThread(1, "ServerThread"))
     threads.append(ClientThread(2, "ClientThread"))
     threads.append(ChannelThread(3, "ChannelThread"))
+    #threads.append(RepairThread(4,"RepairThread"))
 
     for thread in threads:
         thread.start()
