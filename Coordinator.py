@@ -178,9 +178,10 @@ class RepairThread (threading.Thread):
 
     def update(self):
         global RequestPool
+        global kvStore
         while 1:
             time.sleep(DelayPeriod)
-            req = message.Repair()
+            req = message.Repair(kvStore)
             msg = json.dumps(req, cls=message.MessageEncoder)
             RequestPool.append([msg,"repair"])
 
