@@ -17,7 +17,8 @@ ClientSockets = utils.CreateClientSockets(NUM_NODES + 1)
 MessageQueues = utils.CreateMessageQueues(NUM_NODES + 1)
 RequestQueue = [] #Request object
 ValueFromDiffNodes = []
-AckCnt = 0
+AckCnt = 0 #used for model 4
+ReadyForNextRequest = True
 
 def IsCmdValid(cmd):
     return cmd in configure.Commands
@@ -204,49 +205,10 @@ class ClientThread (threading.Thread):
                     print "Invalid command!"
                     #TODO: print out help menu
                     break
-                print "Received request {request} at {timestamp}".format(request=cmdline_input.strip(), timestamp=datetime.datetime.now().time().strftime("%H:%M:%S"))
-                model = request.model
-                RequestQueue.append(request)
-                if request.cmd == "get":
-                    if model == 1:
-                        request.signName(NodeID)
-                        msg = json.dumps(request, cls=message.MessageEncoder)
-                        ClientThread.sendMsg(msg, NUM_NODES) #send request to coordinator
-                    elif model == 2:
-                        request.signName(NodeID)
-                        msg = json.dumps(request, cls=message.MessageEncoder)
-                        ClientThread.sendMsg(msg, NodeID)
-                    elif model == 3:
-                        request.signName(NodeID)
-                        msg = json.dumps(request, cls=message.MessageEncoder)
-                        ClientThread.sendMsg(msg, NodeID)
-                    elif model == 4:
-                        request.signName(NodeID)
-                        msg = json.dumps(request, cls=message.MessageEncoder)
-                        ClientThread.sendMsg(msg, NodeID)
-                        ClientThread.sendMsg(msg, utils.GenerateRandomPeer(NUM_NODES, NodeID))
-                elif request.cmd == "insert" or request.cmd == "update":
-                    if model == 1 or model == 2:
-                        request.signTime()
-                        request.signName(NodeID)
-                        msg = json.dumps(request,cls=message.MessageEncoder)
-                        ClientThread.sendMsg(msg, NUM_NODES)
-                    elif model == 3:
-                        request.signTime()
-                        request.signName(NodeID)
-                        msg = json.dumps(request, cls=message.MessageEncoder)
-                        ClientThread.sendMsg(msg, NodeID)
-                    elif model == 4:
-                        request.signTime()
-                        request.signName(NodeID)
-                        msg = json.dumps(request, cls=message.MessageEncoder)
-                        ClientThread.sendMsg(msg, NodeID)
-                        ClientThread.sendMsg(msg, utils.GenerateRandomPeer(NUM_NODES, NodeID))
-                elif request.cmd == "delete":
-                    request.signName(NodeID)
-                    msg = json.dumps(request, cls=message.MessageEncoder)
-                    ClientThread.sendMsg(msg, NUM_NODES)
 
+                print "Received request {request} at {timestamp}".format(request=cmdline_input.strip(), timestamp=datetime.datetime.now().time().strftime("%H:%M:%S"))
+                RequestQueue.append(request)
+                print len(RequestQueue), ReadyForNextRequest
 
     @staticmethod
     #msg is json string
@@ -277,8 +239,71 @@ class ClientThread (threading.Thread):
                 print "client side: Key {key} deleted at {time}".format(key=RequestQueue[0].key, time=timestamp)
             elif RequestQueue[0].cmd == "update":
                 print "client side: Key {key} updated to {value} at {time}".format(key=RequestQueue[0].key, value=RequestQueue[0].value, time=timestamp)
+            ReadyForNextRequest = True
+            print"turn flag!:", ReadyForNextRequest
             RequestQueue.pop(0)
 
+class RequestThread(threading.Thread):
+    def __init__(self, threadID, name):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.name = name
+
+    def run(self):
+        self.update()
+
+    def update(self):
+        global ReadyForNextRequest
+        while 1:
+            #print ReadyForNextRequest
+            if ReadyForNextRequest:
+                if RequestQueue:
+                    ReadyForNextRequest = False
+                    print "turn flag to false :("
+                    self.handleRequest(RequestQueue[0])
+            time.sleep(0.1)
+
+    def handleRequest(self, request):
+        model = request.model
+        if request.cmd == "get":
+            if model == 1:
+                request.signName(NodeID)
+                msg = json.dumps(request, cls=message.MessageEncoder)
+                ClientThread.sendMsg(msg, NUM_NODES) #send request to coordinator
+            elif model == 2:
+                request.signName(NodeID)
+                msg = json.dumps(request, cls=message.MessageEncoder)
+                ClientThread.sendMsg(msg, NodeID)
+            elif model == 3:
+                request.signName(NodeID)
+                msg = json.dumps(request, cls=message.MessageEncoder)
+                ClientThread.sendMsg(msg, NodeID)
+            elif model == 4:
+                request.signName(NodeID)
+                msg = json.dumps(request, cls=message.MessageEncoder)
+                ClientThread.sendMsg(msg, NodeID)
+                ClientThread.sendMsg(msg, utils.GenerateRandomPeer(NUM_NODES, NodeID))
+        elif request.cmd == "insert" or request.cmd == "update":
+            if model == 1 or model == 2:
+                request.signTime()
+                request.signName(NodeID)
+                msg = json.dumps(request,cls=message.MessageEncoder)
+                ClientThread.sendMsg(msg, NUM_NODES)
+            elif model == 3:
+                request.signTime()
+                request.signName(NodeID)
+                msg = json.dumps(request, cls=message.MessageEncoder)
+                ClientThread.sendMsg(msg, NodeID)
+            elif model == 4:
+                request.signTime()
+                request.signName(NodeID)
+                msg = json.dumps(request, cls=message.MessageEncoder)
+                ClientThread.sendMsg(msg, NodeID)
+                ClientThread.sendMsg(msg, utils.GenerateRandomPeer(NUM_NODES, NodeID))
+        elif request.cmd == "delete":
+            request.signName(NodeID)
+            msg = json.dumps(request, cls=message.MessageEncoder)
+            ClientThread.sendMsg(msg, NUM_NODES)
 
 class ChannelThread (threading.Thread):
     def __init__(self, threadID, name):
@@ -305,6 +330,7 @@ def main():
     threads.append(ServerThread(1, "ServerThread"))
     threads.append(ClientThread(2, "ClientThread"))
     threads.append(ChannelThread(3, "ChannelThread"))
+    threads.append(RequestThread(4, "RequestThread"))
 
     for thread in threads:
         thread.start()
