@@ -9,13 +9,13 @@ import message
 import utils
 
 exitFlag = 0
-NUM_NODES = 2
+NUM_NODES = configure.NUM_NODES
 OutConnectFlags = [False for i in range(NUM_NODES)] #coordinator acts as client
 MessageQueues = [[] for i in range(NUM_NODES)] #coordinator acts as client, send msgs to A/B/C/D nodes
 RequestPool= [] #[request, sender]
 BroadcastFlag = False
 AckFlags = [True for i in range(NUM_NODES)]
-
+IsKeyValid = True
 
 ClientSockets = utils.CreateClientSockets(NUM_NODES)
 
@@ -58,8 +58,18 @@ class ServerThread (threading.Thread):
     def processMsg(self, msg):
         decoded_msg = yaml.load(msg)
         global AckFlags
-        if decoded_msg['type'] in ["ack", "ValueResponse"]:
+        global IsKeyValid
+        if decoded_msg['type'] == 'ack':
             AckFlags[decoded_msg['sender']] = True
+            print AckFlags
+            global IsKeyValid
+            if decoded_msg['content'] == 'null_key':
+                IsKeyValid = False
+            else:
+                IsKeyValid = True
+        elif decoded_msg['type'] == 'ValueResponse':
+            AckFlags[decoded_msg['sender']] = True
+            IsKeyValid = True
             print AckFlags
         elif decoded_msg['type'] == "request":
             print "caching request from ",decoded_msg['sender']
@@ -85,13 +95,17 @@ class ClientThread(threading.Thread):
         global AckFlags
         global RequestPool
         global BroadcastFlag 
+        global IsKeyValid
         while 1:
             if RequestPool:
                 #print BroadcastFlag
                 if BroadcastFlag:
                     if self.readyForNextRequest():
                         #print "sending ack back to the issue client ", RequestPool[0][1]
-                        ack_msg = message.Message("ack")
+                        if IsKeyValid:
+                            ack_msg = message.Message("ack")
+                        else:
+                            ack_msg = message.Message("null_value")
                         ack_msg.signName(NUM_NODES)
                         self.unicast(json.dumps(ack_msg, cls=message.MessageEncoder), RequestPool[0][1])
                         RequestPool.pop(0)

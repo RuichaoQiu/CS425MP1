@@ -8,6 +8,7 @@ import copy
 
 class Message(object):
 	def __init__(self, contentStr):
+		self.content = contentStr
 		self.toString = contentStr.strip()
 		self.sender = ""
 		self.time = ""
@@ -26,6 +27,7 @@ class Message(object):
 			type=self.type, \
 			sender=self.sender, \
 			time=self.time, \
+			content=self.content, \
 			)
 		
 
