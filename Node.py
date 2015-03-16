@@ -21,6 +21,8 @@ AckCnt = 0 #used for model 4
 ReadyForNextRequest = True
 RequestCompleteTimestamp = 0
 DelayTime = 0.0
+SearchResult = [[] for si in xrange(NUM_NODES)]
+ResultCount = 0
 
 
 '''
@@ -70,26 +72,57 @@ class ServerThread (threading.Thread):
             self.showAll()
             return
 
+        if msg[:6] == "search":
+            strlist = msg.split()
+            if int(strlist[1]) not in self.kvStore:
+                tmpch = "#"
+            else:
+                tmpch = str(self.kvStore[int(strlist[1])]['value'])
+            ClientThread.sendMsg("fetch "+strlist[1]+" "+tmpch+" "+str(NodeID),int(strlist[2]))
+            return
+
+        if msg[:5] == "fetch":
+            strlist = msg.split()
+            global SearchResult
+            global ResultCount
+            ResultCount += 1
+            SearchResult[int(strlist[-1])] = [strlist[1],strlist[2]]
+            if ResultCount == NUM_NODES:
+                for i in xrange(NUM_NODES):
+                    ch = chr(i+ord("A"))
+                    print "Server %s: <%s, %s>" % (ch,SearchResult[i][0],SearchResult[i][1])
+                ResultCount = 0
+            return
+
+        if msg[:6] == "repair":
+            strlist = msg.split()
+            if int(strlist[1]) not in self.kvStore:
+                tmpch = "#"
+                tmptime = "#"
+            else:
+                tmpch = str(self.kvStore[int(strlist[1])]['value'])
+                tmptime = self.kvStore[int(strlist[1])]['timestamp']
+            ClientThread.sendMsg("achieve "+strlist[1]+" "+tmpch+" "+tmptime,int(strlist[2]))
+            return
+
+        if msg[:7] == "achieve":
+            strlist = msg.split()
+            if strlist[2] != "#":
+                if int(strlist[1]) not in self.kvStore:
+                    self.kvStore[int(strlist[1])]['value'] = strlist[2]
+                    self.kvStore[int(strlist[1])]['timestamp'] = strlist[3]
+                elif utils.TimestampCmp(strlist[3], self.kvStore[int(strlist[1])]['timestamp']):
+                    self.kvStore[int(strlist[1])]['value'] = strlist[2]
+                    self.kvStore[int(strlist[1])]['timestamp'] = strlist[3]
+            return
+
+
         msg_decoded = yaml.load(msg)
         # Finish inconsistency repair
-        
-        '''if "cmd" in msg_decoded and msg_decoded["cmd"] == "repair":
-            print "why here? %s" % (msg_decoded["cmd"])
-            if "1" in msg_decoded:
-                print "haha %d" % (msg_decoded["1"])
-            else:
-                print "OH NO"
-            self.kvStore = {}
-            for keys in msg_decoded:
-                if keys != "cmd":
-                    self.kvStore[int(keys)] = msg_decoded[keys]
-            return'''
-
-        # receive msg from coordinator
         msg_sender, msg_type = msg_decoded['sender'], msg_decoded['type']
-        if msg_sender == NUM_NODES:              
-            # receive ack 
-            if msg_type == configure.ACK_MSG:     
+        if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
+            #print "receive msg from coordinator"
+            if msg_decoded['type'] == configure.ACK_MSG:       # 1.1: receive ack 
                 ClientThread.clientSideOutput({})
             # receive broadcast request
             elif msg_type == "request":  
@@ -235,9 +268,10 @@ class ClientThread (threading.Thread):
                     break
 
                 # utility tool: search key
-                if cmdline_input.strip()[0] == "search":
+                if cmdline_input.strip()[:6] == "search":
                     for i in xrange(NUM_NODES):
-                        ClientThread.sendMsg(cmdline_input.strip(), i)
+                        ClientThread.sendMsg(cmdline_input.strip()+" "+str(NodeID), i)
+                    break
 
                 # replica operation: insert/delete/update/get...
                 request = message.Request(cmdline_input)            
@@ -302,6 +336,11 @@ class ClientThread (threading.Thread):
             RequestQueue.pop(0)
             global RequestCompleteTimestamp
             RequestCompleteTimestamp = datetime.datetime.now()
+
+    @staticmethod
+    def InconsistencyRepair():
+        for i in xrange(NUM_NODES):
+            ClientThread.sendMsg("repair "+str(NodeID), i)
 
 '''
     RequestThread functionality:

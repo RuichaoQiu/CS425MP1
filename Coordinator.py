@@ -76,7 +76,7 @@ class ServerThread (threading.Thread):
         #print "new pool:", RequestPool
 
         #Store key - value
-        '''print "Get %s %s" % (msg['cmd'],msg['value'])
+        print "Get %s %s" % (msg['cmd'],msg['value'])
         key = int(msg['key'])
         if msg['cmd'] == "insert":
             kvStore[key] = int(msg['value'])
@@ -85,7 +85,8 @@ class ServerThread (threading.Thread):
                 del kvStore[key]
         elif msg['cmd'] == "update":
             if key in kvStore:
-                kvStore[key] = int(msg['value'])'''
+                kvStore[key] = int(msg['value'])
+            print "Update %d %d" % (key, kvStore[key])
 
 class ClientThread(threading.Thread):
     def __init__(self, threadID, name):
@@ -190,10 +191,6 @@ class RepairThread (threading.Thread):
             msg = json.dumps(req, cls=message.MessageEncoder)
             RequestPool.append([msg,"repair"])
             decoded_msg = yaml.load(msg)
-            if "1" in decoded_msg:
-                print "oh yes %d" % (decoded_msg["1"])
-            else:
-                print "nonono"
 
 def main():
     threads = []
