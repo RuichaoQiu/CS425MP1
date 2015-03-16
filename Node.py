@@ -68,6 +68,7 @@ class ServerThread (threading.Thread):
     #msg is json string
     def processMsg(self, msg):
         #print "receive msg: ", msg 
+        """
         if msg == "show-all":
             self.showAll()
             return
@@ -118,7 +119,7 @@ class ServerThread (threading.Thread):
                     self.kvStore[int(strlist[1])]['timestamp'] = strlist[3]
             return
 
-
+        """
         msg_decoded = yaml.load(msg)
         # Finish inconsistency repair
         msg_sender, msg_type = msg_decoded['sender'], msg_decoded['type']

@@ -87,11 +87,9 @@ class ClientThread(threading.Thread):
         global BroadcastFlag 
         while 1:
             if RequestPool:
+                #print BroadcastFlag
                 if BroadcastFlag:
-                    if RequestPool[0][1] == "repair":
-                        RequestPool.pop(0)
-                        BroadcastFlag = False
-                    elif self.readyForNextRequest():
+                    if self.readyForNextRequest():
                         #print "sending ack back to the issue client ", RequestPool[0][1]
                         ack_msg = message.Message("ack")
                         ack_msg.signName(NUM_NODES)
