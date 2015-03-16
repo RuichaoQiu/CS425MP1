@@ -2,6 +2,8 @@ import datetime
 import random
 import socket
 
+import configure
+
 def GenerateRandomDelay(x):
     if x == 0:
         return 0
@@ -32,3 +34,5 @@ def TimestampCmp(ts1, ts2):
 	dt2 = datetime.datetime.strptime(ts2, "%H:%M:%S")
 	return dt1 > dt2
 
+def IsCmdValid(cmd):
+    return cmd in configure.Commands

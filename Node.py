@@ -10,10 +10,9 @@ import utils
 import copy
 
 exitFlag = 0
-NUM_NODES = 2
+NUM_NODES = configure.NUM_NODES
 NodeName = sys.argv[1][0]
 NodeID = utils.NameToID(NodeName)
-
 ClientSockets = utils.CreateClientSockets(NUM_NODES + 1)
 MessageQueues = utils.CreateMessageQueues(NUM_NODES + 1)
 RequestQueue = [] #Request object
@@ -23,9 +22,12 @@ ReadyForNextRequest = True
 RequestCompleteTimestamp = 0
 DelayTime = 0.0
 
-def IsCmdValid(cmd):
-    return cmd in configure.Commands
 
+'''
+    ServerThread functionality:
+        receive request from clients 
+        execute read/write opeartions in the local replica
+'''
 class ServerThread (threading.Thread):
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
@@ -65,14 +67,13 @@ class ServerThread (threading.Thread):
     def processMsg(self, msg):
         #print "receive msg: ", msg 
         if msg == "show-all":
-            #print "I am server. I am going to show - all!"
             self.showAll()
             return
 
         msg_decoded = yaml.load(msg)
         # Finish inconsistency repair
         
-        if "cmd" in msg_decoded and msg_decoded["cmd"] == "repair":
+        '''if "cmd" in msg_decoded and msg_decoded["cmd"] == "repair":
             print "why here? %s" % (msg_decoded["cmd"])
             if "1" in msg_decoded:
                 print "haha %d" % (msg_decoded["1"])
@@ -82,63 +83,53 @@ class ServerThread (threading.Thread):
             for keys in msg_decoded:
                 if keys != "cmd":
                     self.kvStore[int(keys)] = msg_decoded[keys]
-            return
+            return'''
 
-        if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
-            #print "receive msg from coordinator"
-            if msg_decoded['type'] == configure.ACK_MSG:       # 1.1: receive ack 
+        # receive msg from coordinator
+        msg_sender, msg_type = msg_decoded['sender'], msg_decoded['type']
+        if msg_sender == NUM_NODES:              
+            # receive ack 
+            if msg_type == configure.ACK_MSG:     
                 ClientThread.clientSideOutput({})
-            elif msg_decoded['type'] == "request":         # 1.2: receive broadcast request
-                print "receive request from coordinator!"
+            # receive broadcast request
+            elif msg_type == "request":  
+                #print "receive request from coor!!"    
                 if self.executeRequest(msg_decoded):
-                    if msg_decoded['cmd'] == "get": #read, return value
-                        print "client output stage..."
-                        key = msg_decoded['key']
+                    if msg_decoded['cmd'] == "get": 
                         if msg_decoded['original_sender'] == NodeID:
-                            print "on going..."
+                            key = msg_decoded['key']
                             ClientThread.clientSideOutput(self.kvStore[key])
-                print "sending ack to coordinator!"
-                ack_msg = message.Message("ack")
-                ack_msg.signName(NodeID)
-                json_str = json.dumps(ack_msg, cls=message.MessageEncoder)
-                ClientThread.sendMsg(json_str, NUM_NODES)
-            else:                                   # 1.3: receive read result
-                key = msg_decoded['key']
+                self.sendAck(NUM_NODES)
+             # receive read result
+            else:                                  
                 ClientThread.clientSideOutput(self.kvStore[key])
-        else:                                   # 2: receive from peer nodes
-            #print "receive msg from peers!"
+        # receive from peer nodes
+        else:                                  
             global RequestQueue
-            sender_peer = msg_decoded['sender']
-            if msg_decoded['type'] == configure.ACK_MSG:       # 2.1: receive ack 
-                #print "let's see request queue", len(RequestQueue), RequestQueue[0], RequestQueue[0].model
+            # receive ack
+            if msg_type == configure.ACK_MSG:  
                 if RequestQueue and RequestQueue[0].model != 4:
+                    #print "receive ack from {sender}".format(sender=msg_sender)
                     ClientThread.clientSideOutput({})
                 else:
                     global AckCnt
                     AckCnt += 1
-                    #print "AckCnt: ", AckCnt
                     if AckCnt == 2:
                         ClientThread.clientSideOutput({})
                         AckCnt = 0
-            elif msg_decoded['type'] == "request":           # 2.2: receive peer request
-                self.executeRequest(msg_decoded)
-                if msg_decoded['cmd'] == 'get':
-                    print "receive get request from peer!"
-                    value_timestamp = self.kvStore[msg_decoded['key']]
-                    value_msg = message.ValueResponse(value_timestamp)
-                    value_msg.signName(NodeID)
-                    json_str = json.dumps(value_msg, cls=message.MessageEncoder)
-                    ClientThread.sendMsg(json_str, sender_peer)
-                else:
-                    ack_msg = message.Message("ack")
-                    ack_msg.signName(NodeID)
-                    json_str = json.dumps(ack_msg, cls=message.MessageEncoder)
-                    ClientThread.sendMsg(json_str, sender_peer)
-            elif msg_decoded['type'] == 'ValueResponse':                               # 2.3: receive read result
-                #print "receive value_timestamp from peer!"
+            # receive peer request
+            elif msg_type == "request":   
+                if self.executeRequest(msg_decoded):        
+                    if msg_decoded['cmd'] == 'get':
+                        key = msg_decoded['key']
+                        self.sendValueTime(self.kvStore[key], msg_sender)
+                    else:
+                        self.sendAck(msg_sender)
+            # receive read result
+            elif msg_type == 'ValueResponse': 
                 value_ts = {'timestamp':msg_decoded['timestamp'], 'value':msg_decoded['value']}
-                #print "peer's:", value_ts
-                if RequestQueue and RequestQueue[0].model != 4:     
+                if RequestQueue and RequestQueue[0].model != 4:  
+                    #print "receive value from ", msg_sender   
                     ClientThread.clientSideOutput(value_ts)
                 else:
                     global ValueFromDiffNodes
@@ -147,38 +138,49 @@ class ServerThread (threading.Thread):
                         print "Candidate values are:"
                         for candidate in ValueFromDiffNodes:
                             print candidate['value'], candidate['timestamp']
-
                         if utils.TimestampCmp(ValueFromDiffNodes[0]['timestamp'], ValueFromDiffNodes[1]['timestamp']):
                             latest_pair = ValueFromDiffNodes[0]
                         else:
                             latest_pair = ValueFromDiffNodes[1]
-                        #print "latest_pair:", latest_pair
                         ClientThread.clientSideOutput(latest_pair)
                         ValueFromDiffNodes[:] = []
 
+    def sendAck(self, dest_id):
+        print "sending ack to {dest}".format(dest=dest_id)
+        ack_msg = message.Message("ack")
+        ack_msg.signName(NodeID)
+        json_str = json.dumps(ack_msg, cls=message.MessageEncoder)
+        ClientThread.sendMsg(json_str, dest_id)
+
+    def sendValueTime(self, value_ts, dest_id):
+        print "sending value {value} to {dest}".format(value=value_ts['value'], dest=dest_id)
+        value_msg = message.ValueResponse(value_ts)
+        value_msg.signName(NodeID)
+        json_str = json.dumps(value_msg, cls=message.MessageEncoder)
+        ClientThread.sendMsg(json_str, dest_id)
+
     #msg is dict decoded from json string
     def executeRequest(self, msg):
-        key = msg['key']
-        print type(key)
-        if msg['cmd'] == "insert":
-            self.kvStore[key] = {'timestamp':msg['time'], 'value':int(msg['value'])}
-            print "Inserted key {key} value {value}".format(key=key, value=self.kvStore[key]['value'])
-        elif msg['cmd'] == "delete":
+        key, cmd = msg['key'], msg['cmd']
+        if cmd == "insert":
+            self.kvStore[key] = {'timestamp':msg['time'], 'value':msg['value']}
+            print "Server side: Inserted key {key} value {value}".format(key=key, value=self.kvStore[key]['value'])
+        elif cmd == "delete":
             if self.validateKey(key):
                 del self.kvStore[key]
-                print "Key {key} deleted".format(key=key)
+                print "Server side: Key {key} deleted".format(key=key)
             else:
                 return False
-        elif msg['cmd'] == "update":
+        elif cmd == "update":
             if self.validateKey(key):
                 old_value = self.kvStore[key]['value']
             else:
                 old_value = "NULL"
             self.kvStore[key] = {'timestamp':msg['time'], 'value':int(msg['value'])}
-            print "Key {key} changed from {old_value} to {new_value}".format(key=key, old_value=old_value, new_value = self.kvStore[key]['value'])
-        elif msg['cmd'] == "get":
+            print "Server side: Key {key} changed from {old_value} to {new_value}".format(key=key, old_value=old_value, new_value = self.kvStore[key]['value'])
+        elif cmd == "get":
             if self.validateKey(key):
-                print "get({key}) = {value}".format(key=key, value=self.kvStore[key]['value'])
+                print "Server side: get({key}) = {value}".format(key=key, value=self.kvStore[key]['value'])
             else:
                 return False
         return True
@@ -195,7 +197,11 @@ class ServerThread (threading.Thread):
         for key, value in self.kvStore.items():
             print "<{key}, {value}>".format(key=key, value=value['value'])
 
-
+'''
+    ClientThread functionality:
+        receive request from user input 
+        cache requet in a FIFO queue
+'''
 class ClientThread (threading.Thread):
     outConnectFlags = [False for i in xrange(NUM_NODES + 1)]
 
@@ -235,21 +241,21 @@ class ClientThread (threading.Thread):
 
                 # replica operation: insert/delete/update/get...
                 request = message.Request(cmdline_input)            
-                if not IsCmdValid(request.cmd):
+                if not utils.IsCmdValid(request.cmd):
                     print "Invalid command!"
                     #TODO: print out help menu
                     break
-
-                print "Received request {request} at {timestamp}".format(request=cmdline_input.strip(), timestamp=datetime.datetime.now().time().strftime("%H:%M:%S"))
+                print "Received request {request} at {timestamp}".format( \
+                    request=cmdline_input.strip(), \
+                    timestamp=datetime.datetime.now().time().strftime("%H:%M:%S"))
                 RequestQueue.append(request)
-                #print len(RequestQueue), ReadyForNextRequest
 
     @staticmethod
     #msg is json string
     def sendMsg(msg, dest_id):
         global ClientSockets
         if not ClientThread.outConnectFlags[dest_id]:
-            #print "build connect with ", dest_id
+            print "build connect with ", dest_id
             ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
             ClientThread.outConnectFlags[dest_id] = True
         ClientThread.addQueue(msg, utils.GenerateRandomDelay(configure.DelayList[dest_id][NodeID]), dest_id)
@@ -257,31 +263,50 @@ class ClientThread (threading.Thread):
     @staticmethod
     def addQueue(messagestr,delaynum, dest_id):
         #print "add message ", messagestr, " to queue!"
+        #print "delay is ", delaynum
         global MessageQueues
         MessageQueues[dest_id].append([datetime.datetime.now()+datetime.timedelta(0,delaynum),messagestr])
 
     @staticmethod
     def clientSideOutput(option_value_ts):
-        #print "Current requests: ", RequestQueue[0]
         if RequestQueue:
             timestamp = datetime.datetime.now().time().strftime("%H:%M:%S")
             if RequestQueue[0].cmd == "get":
                 if RequestQueue[0].model in [1,2]:
-                    print "client side: get({key}) = {value} at {time}".format(key=RequestQueue[0].key, value=option_value_ts['value'], time=timestamp) 
+                    print "client side: get({key}) = {value} at {time}".format( \
+                        key=RequestQueue[0].key, \
+                        value=option_value_ts['value'], \
+                        time=timestamp) 
                 else: #evantual consistency models
-                    print "client side: get({key}) = ({value}, {ts}) at {time}".format(key=RequestQueue[0].key, value=option_value_ts['value'], ts=option_value_ts['timestamp'], time=timestamp)            
+                    print "client side: get({key}) = ({value}, {ts}) at {time}".format( \
+                        key=RequestQueue[0].key, \
+                        value=option_value_ts['value'], \
+                        ts=option_value_ts['timestamp'], \
+                        time=timestamp)            
             elif RequestQueue[0].cmd == "insert":
-                print "client side: Inserted key {key} value {value} at {time}".format(key=RequestQueue[0].key, value=RequestQueue[0].value, time=timestamp)
+                print "client side: Inserted key {key} value {value} at {time}".format( \
+                    key=RequestQueue[0].key, \
+                    value=RequestQueue[0].value, \
+                    time=timestamp)
             elif RequestQueue[0].cmd == "delete":
-                print "client side: Key {key} deleted at {time}".format(key=RequestQueue[0].key, time=timestamp)
+                print "client side: Key {key} deleted at {time}".format( \
+                    key=RequestQueue[0].key, \
+                    time=timestamp)
             elif RequestQueue[0].cmd == "update":
-                print "client side: Key {key} updated to {value} at {time}".format(key=RequestQueue[0].key, value=RequestQueue[0].value, time=timestamp)
+                print "client side: Key {key} updated to {value} at {time}".format( \
+                    key=RequestQueue[0].key, \
+                    value=RequestQueue[0].value, \
+                    time=timestamp)
             global ReadyForNextRequest
             ReadyForNextRequest = True
             RequestQueue.pop(0)
             global RequestCompleteTimestamp
             RequestCompleteTimestamp = datetime.datetime.now()
 
+'''
+    RequestThread functionality:
+        handle requests cached in the FIFO queue
+'''
 class RequestThread(threading.Thread):
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
@@ -297,57 +322,46 @@ class RequestThread(threading.Thread):
         global DelayTime
         while 1:
             CurTime = datetime.datetime.now()
-            #print ReadyForNextRequest
             if ReadyForNextRequest and (DelayTime == 0.0 or RequestCompleteTimestamp+datetime.timedelta(0,DelayTime) <= CurTime):
                 if RequestQueue:
                     ReadyForNextRequest = False
                     DelayTime = 0.0
-                    #print "turn flag to false :("
                     self.handleRequest(RequestQueue[0])
             time.sleep(0.1)
 
     def handleRequest(self, request):
+        print "handle request!"
         model = request.model
         if request.cmd == "get":
             if model == 1:
-                request.signName(NodeID)
-                msg = json.dumps(request, cls=message.MessageEncoder)
-                ClientThread.sendMsg(msg, NUM_NODES) #send request to coordinator
-            elif model == 2:
-                request.signName(NodeID)
-                msg = json.dumps(request, cls=message.MessageEncoder)
-                ClientThread.sendMsg(msg, NodeID)
-            elif model == 3:
-                request.signName(NodeID)
-                msg = json.dumps(request, cls=message.MessageEncoder)
-                ClientThread.sendMsg(msg, NodeID)
+                self.sendRequest(request, False, True, [NUM_NODES])
+            elif model == 2 or model == 3:
+                self.sendRequest(request, False, True, [NodeID])
             elif model == 4:
-                request.signName(NodeID)
-                msg = json.dumps(request, cls=message.MessageEncoder)
-                ClientThread.sendMsg(msg, NodeID)
-                ClientThread.sendMsg(msg, utils.GenerateRandomPeer(NUM_NODES, NodeID))
-        elif request.cmd == "insert" or request.cmd == "update":
+                self.sendRequest(request, False, True, [NodeID, utils.GenerateRandomPeer(NUM_NODES, NodeID)])
+        elif request.cmd in ["insert", "update"]:
             if model == 1 or model == 2:
-                request.signTime()
-                request.signName(NodeID)
-                msg = json.dumps(request,cls=message.MessageEncoder)
-                ClientThread.sendMsg(msg, NUM_NODES)
+                self.sendRequest(request, True, True, [NUM_NODES])
             elif model == 3:
-                request.signTime()
-                request.signName(NodeID)
-                msg = json.dumps(request, cls=message.MessageEncoder)
-                ClientThread.sendMsg(msg, NodeID)
+                self.sendRequest(request, True, True, [NodeID])
             elif model == 4:
-                request.signTime()
-                request.signName(NodeID)
-                msg = json.dumps(request, cls=message.MessageEncoder)
-                ClientThread.sendMsg(msg, NodeID)
-                ClientThread.sendMsg(msg, utils.GenerateRandomPeer(NUM_NODES, NodeID))
+                self.sendRequest(request, True, True, [NodeID, utils.GenerateRandomPeer(NUM_NODES, NodeID)])
         elif request.cmd == "delete":
-            request.signName(NodeID)
-            msg = json.dumps(request, cls=message.MessageEncoder)
-            ClientThread.sendMsg(msg, NUM_NODES)
+            self.sendRequest(request, False, True, [NUM_NODES])
 
+    def sendRequest(self, request, signTime, signName, dest_id_list):
+        if signTime:
+            request.signTime()
+        if signName:
+            request.signName(NodeID)
+        msg = json.dumps(request, cls=message.MessageEncoder)
+        for dest_id in dest_id_list:
+            ClientThread.sendMsg(msg, dest_id)
+
+'''
+    ChannelThread functionality:
+        simlulate delay channel
+'''
 class ChannelThread (threading.Thread):
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)

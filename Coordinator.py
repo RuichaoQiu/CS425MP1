@@ -76,7 +76,7 @@ class ServerThread (threading.Thread):
         #print "new pool:", RequestPool
 
         #Store key - value
-        print "Get %s %s" % (msg['cmd'],msg['value'])
+        '''print "Get %s %s" % (msg['cmd'],msg['value'])
         key = int(msg['key'])
         if msg['cmd'] == "insert":
             kvStore[key] = int(msg['value'])
@@ -85,7 +85,7 @@ class ServerThread (threading.Thread):
                 del kvStore[key]
         elif msg['cmd'] == "update":
             if key in kvStore:
-                kvStore[key] = int(msg['value'])
+                kvStore[key] = int(msg['value'])'''
 
 class ClientThread(threading.Thread):
     def __init__(self, threadID, name):
@@ -102,7 +102,6 @@ class ClientThread(threading.Thread):
         global BroadcastFlag 
         while 1:
             if RequestPool:
-                #print BroadcastFlag
                 if BroadcastFlag:
                     if RequestPool[0][1] == "repair":
                         RequestPool.pop(0)
@@ -140,7 +139,7 @@ class ClientThread(threading.Thread):
     #msg is json string format
     def unicast(self, msg, dest_id):
         global ClientSockets
-        print "sending {msg} to {dest}".format(msg=msg, dest=dest_id)
+        print "sending msg to {dest}".format(dest=dest_id)
         if not OutConnectFlags[dest_id]:
             ClientSockets[dest_id].connect(("localhost", configure.PortList[dest_id]))
             OutConnectFlags[dest_id] = True
@@ -149,6 +148,7 @@ class ClientThread(threading.Thread):
     @staticmethod
     def addQueue(messagestr,delaynum,dest):
         global MessageQueues
+        #print "delay: ", delaynum
         MessageQueues[dest].append([datetime.datetime.now()+datetime.timedelta(0,delaynum),messagestr])
 
 class ChannelThread (threading.Thread):
@@ -167,6 +167,7 @@ class ChannelThread (threading.Thread):
             CurTime = datetime.datetime.now()
             for si in xrange(NUM_NODES):
                 while MessageQueues[si] and MessageQueues[si][0][0] <= CurTime:
+                    #print "actually send to ", si
                     ClientSockets[si].send(MessageQueues[si][0][1])
                     MessageQueues[si].pop(0)
             time.sleep(0.1)
@@ -199,7 +200,7 @@ def main():
     threads.append(ServerThread(1, "ServerThread"))
     threads.append(ClientThread(2, "ClientThread"))
     threads.append(ChannelThread(3, "ChannelThread"))
-    threads.append(RepairThread(4,"RepairThread"))
+    #threads.append(RepairThread(4,"RepairThread"))
 
     for thread in threads:
         thread.start()
