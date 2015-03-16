@@ -68,7 +68,7 @@ class ServerThread (threading.Thread):
     #msg is json string
     def processMsg(self, msg):
         #print "receive msg: ", msg 
-        """
+        
         if msg == "show-all":
             self.showAll()
             return
@@ -119,7 +119,7 @@ class ServerThread (threading.Thread):
                     self.kvStore[int(strlist[1])]['timestamp'] = strlist[3]
             return
 
-        """
+        
         msg_decoded = yaml.load(msg)
         # Finish inconsistency repair
         msg_sender, msg_type = msg_decoded['sender'], msg_decoded['type']
@@ -382,8 +382,8 @@ class RequestThread(threading.Thread):
                 self.sendRequest(request, False, True, [NodeID])
             elif model == 4:
                 self.sendRequest(request, False, True, [NodeID, utils.GenerateRandomPeer(NUM_NODES, NodeID)])
-            #if model == 3 or model == 4:
-                #ClientThread.InconsistencyRepair(request.key)
+            if model == 3 or model == 4:
+                ClientThread.InconsistencyRepair(request.key)
         elif request.cmd in ["insert", "update"]:
             if model == 1 or model == 2:
                 self.sendRequest(request, True, True, [NUM_NODES])
