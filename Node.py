@@ -397,6 +397,9 @@ class RequestThread(threading.Thread):
             CurTime = datetime.datetime.now()
             if ReadyForNextRequest and (DelayTime == 0.0 or RequestCompleteTimestamp+datetime.timedelta(0,DelayTime) <= CurTime):
                 if RequestQueue:
+                    print "Client: start to handle request {request} at {time}".format( \
+                        request=RequestQueue[0].content, \
+                        time=datetime.datetime.now().time().strftime("%H:%M:%S"))
                     ReadyForNextRequest = False
                     DelayTime = 0.0
                     self.handleRequest(RequestQueue[0])
