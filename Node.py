@@ -179,7 +179,8 @@ class ServerThread (threading.Thread):
                             self.kvStore[CurrentKey] = copy.deepcopy(value_ts)
                     ReplicaCounter += 1
                     if ReplicaCounter == NUM_NODES:
-                        print "Server: Inconsistency Repair is Completed! Key: {key} Value: value at {time}".format( \
+                        print self.kvStore[CurrentKey]['value']
+                        print "Server: Inconsistency Repair is Completed! Key: {key} Value: {value} Timestamp: {time}".format( \
                                 key=CurrentKey, \
                                 value=self.kvStore[CurrentKey]['value'], \
                                 time=self.kvStore[CurrentKey]['timestamp']) 
