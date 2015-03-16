@@ -122,6 +122,7 @@ class ServerThread (threading.Thread):
         msg_decoded = yaml.load(msg)
         # Finish inconsistency repair
         msg_sender, msg_type = msg_decoded['sender'], msg_decoded['type']
+        print "Debug: %s" % (msg_decoded['cmd'])
         if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
             #print "receive msg from coordinator"
             if msg_decoded['type'] == configure.ACK_MSG:       # 1.1: receive ack 
@@ -380,8 +381,8 @@ class RequestThread(threading.Thread):
                 self.sendRequest(request, False, True, [NodeID])
             elif model == 4:
                 self.sendRequest(request, False, True, [NodeID, utils.GenerateRandomPeer(NUM_NODES, NodeID)])
-            if model == 3 or model == 4:
-                ClientThread.InconsistencyRepair(request.key)
+            #if model == 3 or model == 4:
+                #ClientThread.InconsistencyRepair(request.key)
         elif request.cmd in ["insert", "update"]:
             if model == 1 or model == 2:
                 self.sendRequest(request, True, True, [NUM_NODES])
