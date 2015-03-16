@@ -122,7 +122,7 @@ class ServerThread (threading.Thread):
         msg_decoded = yaml.load(msg)
         # Finish inconsistency repair
         msg_sender, msg_type = msg_decoded['sender'], msg_decoded['type']
-        print "Debug: %s" % (msg_decoded['cmd'])
+        #print "Debug: %s" % (msg_decoded['cmd'])
         if msg_decoded['sender'] == NUM_NODES:              # 1: receive from coordinator
             #print "receive msg from coordinator"
             if msg_decoded['type'] == configure.ACK_MSG:       # 1.1: receive ack 
@@ -286,6 +286,7 @@ class ClientThread (threading.Thread):
                     request=cmdline_input.strip(), \
                     timestamp=datetime.datetime.now().time().strftime("%H:%M:%S"))
                 RequestQueue.append(request)
+                print len(RequestQueue)
 
     @staticmethod
     #msg is json string
@@ -364,7 +365,8 @@ class RequestThread(threading.Thread):
         global DelayTime
         while 1:
             CurTime = datetime.datetime.now()
-            if ReadyForNextRequest and (DelayTime == 0.0 or RequestCompleteTimestamp+datetime.timedelta(0,DelayTime) <= CurTime):
+            #if ReadyForNextRequest and (DelayTime == 0.0 or RequestCompleteTimestamp+datetime.timedelta(0,DelayTime) <= CurTime):
+            if ReadyForNextRequest:
                 if RequestQueue:
                     ReadyForNextRequest = False
                     DelayTime = 0.0
