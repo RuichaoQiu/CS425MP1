@@ -23,6 +23,9 @@ RequestCompleteTimestamp = 0
 DelayTime = 0.0
 SearchResult = [[] for si in xrange(NUM_NODES)]
 ResultCount = 0
+CurrentKey = 0
+ReplicaCounter = 0
+CurrentModel = 0
 
 
 '''
@@ -95,30 +98,6 @@ class ServerThread (threading.Thread):
                 ResultCount = 0
             return
 
-        if msg[:6] == "repair":
-            strlist = msg.split()
-            #print "Receive repair %s %s" % (strlist[1],strlist[2])
-            if int(strlist[1]) not in self.kvStore:
-                tmpch = "#"
-                tmptime = "#"
-            else:
-                tmpch = str(self.kvStore[int(strlist[1])]['value'])
-                tmptime = self.kvStore[int(strlist[1])]['timestamp']
-            ClientThread.sendMsg("achieve "+strlist[1]+" "+tmpch+" "+tmptime,int(strlist[2]))
-            return
-
-        if msg[:7] == "achieve":
-            strlist = msg.split()
-            #print "Receive Achieve %s %s" % (strlist[2],strlist[3])
-            if strlist[2] != "#":
-                if int(strlist[1]) not in self.kvStore:
-                    self.kvStore[int(strlist[1])]['value'] = strlist[2]
-                    self.kvStore[int(strlist[1])]['timestamp'] = strlist[3]
-                elif utils.TimestampCmp(strlist[3], self.kvStore[int(strlist[1])]['timestamp']):
-                    self.kvStore[int(strlist[1])]['value'] = strlist[2]
-                    self.kvStore[int(strlist[1])]['timestamp'] = strlist[3]
-            return
-
         
         msg_decoded = yaml.load(msg)
         # Finish inconsistency repair
@@ -187,6 +166,26 @@ class ServerThread (threading.Thread):
             elif msg_type == 'ValueResponse': 
                 print "Server: receive value from peer ", msg_sender
                 value_ts = {'timestamp':msg_decoded['timestamp'], 'value':msg_decoded['value']}
+
+                # Inconsistency Repair
+                global CurrentModel
+                global CurrentKey
+                global ReplicaCounter
+                if CurrentModel == 3 or CurrentModel == 4:
+                    if value_ts['value'] not in self.kvStore:
+                        self.kvStore[CurrentKey] = copy.deepcopy(value_ts)
+                    else:
+                        if utils.TimestampCmp(value_ts['timestamp'], self.kvStore[CurrentKey]['timestamp']):
+                            self.kvStore[CurrentKey] = copy.deepcopy(value_ts)
+                    ReplicaCounter += 1
+                    if ReplicaCounter == NUM_NODES:
+                        print "Server: Inconsistency Repair is Completed! Key: {key} Value: value at {time}".format( \
+                                key=CurrentKey, \
+                                value=self.kvStore[CurrentKey]['value'], \
+                                time=self.kvStore[CurrentKey]['timestamp']) 
+                        CurrentKey = 0
+                        ReplicaCounter = 0
+
                 if not ReadyForNextRequest:
                     if RequestQueue:
                         if RequestQueue[0].model != 4:  
@@ -371,11 +370,6 @@ class ClientThread (threading.Thread):
             global RequestCompleteTimestamp
             RequestCompleteTimestamp = datetime.datetime.now()
 
-    @staticmethod
-    def InconsistencyRepair(rkey):
-        for i in xrange(NUM_NODES):
-            ClientThread.sendMsg("repair "+str(rkey)+" "+str(NodeID), i)
-
 '''
     RequestThread functionality:
         handle requests cached in the FIFO queue
@@ -406,6 +400,9 @@ class RequestThread(threading.Thread):
             time.sleep(0.1)
 
     def handleRequest(self, request):
+        global CurrentKey
+        global CurrentModel
+        CurrentModel = request.model
         model = request.model
         if request.cmd == "get":
             if model == 1:
@@ -413,8 +410,8 @@ class RequestThread(threading.Thread):
             elif model == 2:
                 self.sendRequest(request, False, True, NodeID)
             elif model in [3,4]:
+                CurrentKey = request.key
                 self.broadcast(request, False, True)
-               # ClientThread.InconsistencyRepair(request.key)
         elif request.cmd in ["insert", "update"]:
             if model in [1,2]:
                 self.sendRequest(request, True, True, NUM_NODES)
