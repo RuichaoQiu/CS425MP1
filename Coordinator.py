@@ -15,9 +15,7 @@ MessageQueues = [[] for i in range(NUM_NODES)] #coordinator acts as client, send
 RequestPool= [] #[request, sender]
 BroadcastFlag = False
 AckFlags = [True for i in range(NUM_NODES)]
-DelayPeriod = 15
 
-kvStore = {}
 
 ClientSockets = utils.CreateClientSockets(NUM_NODES)
 
@@ -70,23 +68,9 @@ class ServerThread (threading.Thread):
     def cacheRequest(self, request, sender, msg):
         global RequestPool
         global AckFlags
-        global kvStore
         #print "old pool:", RequestPool
         RequestPool.append([request, sender])
         #print "new pool:", RequestPool
-
-        #Store key - value
-        print "Get %s %s" % (msg['cmd'],msg['value'])
-        key = int(msg['key'])
-        if msg['cmd'] == "insert":
-            kvStore[key] = int(msg['value'])
-        elif msg['cmd'] == "delete":
-            if key in kvStore:
-                del kvStore[key]
-        elif msg['cmd'] == "update":
-            if key in kvStore:
-                kvStore[key] = int(msg['value'])
-            print "Update %d %d" % (key, kvStore[key])
 
 class ClientThread(threading.Thread):
     def __init__(self, threadID, name):
@@ -173,31 +157,13 @@ class ChannelThread (threading.Thread):
                     MessageQueues[si].pop(0)
             time.sleep(0.1)
 
-class RepairThread (threading.Thread):
-    def __init__(self, threadID, name):
-        threading.Thread.__init__(self)
-        self.threadID = threadID
-        self.name = name
-
-    def run(self):
-        self.update()
-
-    def update(self):
-        global RequestPool
-        global kvStore
-        while 1:
-            time.sleep(DelayPeriod)
-            req = message.Repair(kvStore)
-            msg = json.dumps(req, cls=message.MessageEncoder)
-            RequestPool.append([msg,"repair"])
-            decoded_msg = yaml.load(msg)
 
 def main():
     threads = []
     threads.append(ServerThread(1, "ServerThread"))
     threads.append(ClientThread(2, "ClientThread"))
     threads.append(ChannelThread(3, "ChannelThread"))
-    #threads.append(RepairThread(4,"RepairThread"))
+    
 
     for thread in threads:
         thread.start()

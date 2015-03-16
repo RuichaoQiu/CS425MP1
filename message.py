@@ -53,14 +53,6 @@ class Request(Message):
 			time=self.time, \
 			)
 
-class Repair(Message):
-	def __init__(self,kv):
-		self.kvStore = copy.deepcopy(kv)
-		self.kvStore["cmd"] = "UpdateResult"
-
-	def __json__(self):
-		return self.kvStore
-
 
 class ValueResponse(Message):
 	def __init__(self, value_timestamp_pair):

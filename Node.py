@@ -96,6 +96,7 @@ class ServerThread (threading.Thread):
 
         if msg[:6] == "repair":
             strlist = msg.split()
+            #print "Receive repair %s %s" % (strlist[1],strlist[2])
             if int(strlist[1]) not in self.kvStore:
                 tmpch = "#"
                 tmptime = "#"
@@ -107,6 +108,7 @@ class ServerThread (threading.Thread):
 
         if msg[:7] == "achieve":
             strlist = msg.split()
+            #print "Receive Achieve %s %s" % (strlist[2],strlist[3])
             if strlist[2] != "#":
                 if int(strlist[1]) not in self.kvStore:
                     self.kvStore[int(strlist[1])]['value'] = strlist[2]
@@ -338,9 +340,9 @@ class ClientThread (threading.Thread):
             RequestCompleteTimestamp = datetime.datetime.now()
 
     @staticmethod
-    def InconsistencyRepair():
+    def InconsistencyRepair(rkey):
         for i in xrange(NUM_NODES):
-            ClientThread.sendMsg("repair "+str(NodeID), i)
+            ClientThread.sendMsg("repair "+str(rkey)+" "+str(NodeID), i)
 
 '''
     RequestThread functionality:
@@ -378,6 +380,8 @@ class RequestThread(threading.Thread):
                 self.sendRequest(request, False, True, [NodeID])
             elif model == 4:
                 self.sendRequest(request, False, True, [NodeID, utils.GenerateRandomPeer(NUM_NODES, NodeID)])
+            if model == 3 or model == 4:
+                ClientThread.InconsistencyRepair(request.key)
         elif request.cmd in ["insert", "update"]:
             if model == 1 or model == 2:
                 self.sendRequest(request, True, True, [NUM_NODES])
