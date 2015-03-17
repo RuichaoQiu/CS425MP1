@@ -53,19 +53,19 @@ I. Usage
 
 
 II. File list
+
 	DelayChannel.sh 				shell script for running "Simulating network delays (step 1)" functionality
 	delayconfigure.py 				config file for "Simulating network delays (step 1)" functionality
 	Server.py 						a skeleton implementation of replica node for "Simulating network delays (step 1)" functionality
-
 	Setup.sh 						shell script for running "Key-Value Store and Consistency Models (step 2)" functionality
 	configure.py 					config file for "Key-Value Store and Consistency Models (step 2)" functionality
 	Coordinator.py 					implementation of central coordinator for totally ordered broadcast
 	Node.py 						implementation of node replicas
 	message.py 						implementation of different messages
 	utils.py 						some utility function
-
 	README.md                       this file
 
 
 III. System requirement
+
 	Python version >= 2.7
