@@ -1,1 +1,2 @@
-insert 1 2 1
+Send Hello B
+Send yes C

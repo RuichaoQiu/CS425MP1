@@ -1,14 +1,14 @@
 import threading
 import time
 import socket, select, string, sys
-import configure
+import delayconfigure
 import random
 import datetime
 exitFlag = 0
 
-# ConnectFlag sets whether it's first time to connect other server
+# Flag to check whether it's first time to connect the server
 ConnectFlag = [[False for i in xrange(4)] for j in xrange(4)]
-# FIFO Message Queue to implement delay channel
+# Message Queue to implement delay channel.
 MessageQueue = [[],[],[],[]]
 s = []
 for si in xrange(4):
@@ -16,7 +16,7 @@ for si in xrange(4):
     st.settimeout(2)
     s.append(st)
 
-# Server Side, receive message
+# Server side, receive message
 class ServerThread (threading.Thread):
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
@@ -28,7 +28,7 @@ class ServerThread (threading.Thread):
 def RunServer():
     CONNECTION_LIST = []
     RECV_BUFFER = 4096 
-    PORT = configure.GetNodePortNumber(sys.argv[1])
+    PORT = delayconfigure.GetPortNumber(sys.argv[1])
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind(("0.0.0.0", PORT))
@@ -44,7 +44,7 @@ def RunServer():
                 try:
                     data = sock.recv(RECV_BUFFER)
                     tmpl = data.split()
-                    print "Received "+" ".join(tmpl[:-1])+" from "+tmpl[-1]+", Max delay is "+str(configure.GetNodeDelay(sys.argv[1][0]))+"s, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
+                    print "Received "+" ".join(tmpl[:-1])+" from "+tmpl[-1]+", Max delay is "+str(delayconfigure.GetDelay(ord(tmpl[-1][0])-ord('A'),ord(sys.argv[1][0])-ord('A')))+"s, system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
                 except:
                     sock.close()
                     CONNECTION_LIST.remove(sock)
@@ -63,22 +63,40 @@ class ClientThread (threading.Thread):
 def RunClient():
     global ConnectFlag
     global s
+    print "Hello, my name is Server "+sys.argv[1][0]
     while 1:
         socket_list = [sys.stdin]
         read_sockets, write_sockets, error_sockets = select.select(socket_list , [], []) 
         for sock in read_sockets:
             msg = sys.stdin.readline()
-            l = msg.split()
-            x = ord(sys.argv[1][0])-ord('A')
-            y = ord(l[-1])-ord('A')
-            if not ConnectFlag[x][y]:
-                s[y].connect(("localhost", configure.GetNodePortNumber(l[-1])))
-                ConnectFlag[x][y] = True
-            l = l[1:len(l)-1]
-            l.append(sys.argv[1])
-            tmpstr = " ".join(l)
-            AddQueue(tmpstr,GenerateRandomDelay(configure.GetNodeDelay(l[-1])),y)
-            print "Sent "+ " ".join(l[:len(l)-1])+" to "+chr(y+ord('A'))+", system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
+
+            if msg.strip()[:5] == "start":
+                print "Start reading file..."
+                f = open(sys.argv[1][0]+".txt","r")
+                msg = f.readline()
+                while msg:
+                    ch = raw_input()
+                    print "Read from file: "+msg
+                    ExeUpdate(msg[:])
+                    msg = f.readline()
+                print "Reading file Completed!"
+            else:
+                ExeUpdate(msg[:])
+
+def ExeUpdate(msg):
+    global ConnectFlag
+    global s
+    l = msg.split()
+    x = ord(sys.argv[1][0])-ord('A')
+    y = ord(l[-1])-ord('A')
+    if not ConnectFlag[x][y]:
+        s[y].connect(("localhost", delayconfigure.GetPortNumber(l[-1])))
+        ConnectFlag[x][y] = True
+    l = l[1:len(l)-1]
+    l.append(sys.argv[1])
+    tmpstr = " ".join(l)
+    AddQueue(tmpstr,GenerateRandomDelay(delayconfigure.GetDelay(x,y)),y)
+    print "Sent "+ " ".join(l[:len(l)-1])+" to "+chr(y+ord('A'))+", system time is "+ (datetime.datetime.now().time().strftime("%H:%M:%S"))
 
 def GenerateRandomDelay(x):
     if x == 0:
@@ -89,7 +107,7 @@ def AddQueue(messagestr,delaynum,dest):
     global MessageQueue
     MessageQueue[dest].append([datetime.datetime.now()+datetime.timedelta(0,delaynum),messagestr])
 
-# Check whether to send out message
+# Used for check it's the right time to send message
 class ChannelThread (threading.Thread):
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
