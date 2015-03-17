@@ -6,7 +6,9 @@ import random
 import datetime
 exitFlag = 0
 
+# ConnectFlag sets whether it's first time to connect other server
 ConnectFlag = [[False for i in xrange(4)] for j in xrange(4)]
+# FIFO Message Queue to implement delay channel
 MessageQueue = [[],[],[],[]]
 s = []
 for si in xrange(4):
@@ -87,6 +89,7 @@ def AddQueue(messagestr,delaynum,dest):
     global MessageQueue
     MessageQueue[dest].append([datetime.datetime.now()+datetime.timedelta(0,delaynum),messagestr])
 
+# Check whether to send out message
 class ChannelThread (threading.Thread):
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
