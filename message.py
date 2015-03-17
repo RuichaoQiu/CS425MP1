@@ -6,7 +6,13 @@ import yaml
 import configure
 import copy
 
+
 class Message(object):
+	"""
+		Base class for message.
+		Default type is "ack".
+		Support sign name and time at the end of message.
+	"""
 	def __init__(self, contentStr):
 		self.content = contentStr.strip()
 		self.toString = contentStr.strip()
@@ -32,6 +38,9 @@ class Message(object):
 		
 
 class Request(Message):
+	"""
+		Class for request.
+	"""
 	def __init__(self, contentStr):
 		Message.__init__(self, contentStr)
 		components = contentStr.strip().split()
@@ -57,6 +66,9 @@ class Request(Message):
 
 
 class ValueResponse(Message):
+	"""
+		Class for value as response to get request.
+	"""
 	def __init__(self, value_timestamp_pair):
 		Message.__init__(self, "Value")
 		self.value = int(value_timestamp_pair['value'])

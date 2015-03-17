@@ -20,6 +20,11 @@ IsKeyValid = True
 ClientSockets = utils.CreateClientSockets(NUM_NODES)
 
 class ServerThread (threading.Thread):
+    """
+        ServerThread:
+            receive request from replica clients 
+            cache request to guarantee totally ordered broadcast
+    """
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
         self.threadID = threadID
@@ -28,6 +33,9 @@ class ServerThread (threading.Thread):
     def run(self):
         self.update()
 
+    """
+        Receive and process message passed by socket on server side
+    """
     def update(self):
         CONNECTION_LIST = []
         RECV_BUFFER = 4096 
@@ -46,7 +54,6 @@ class ServerThread (threading.Thread):
                 else:
                     try:
                         msg = read_socket.recv(RECV_BUFFER)
-                        #print "receive msg: ", msg
                         self.processMsg(msg)
                     except:
                         CONNECTION_LIST.remove(read_socket)
@@ -54,7 +61,13 @@ class ServerThread (threading.Thread):
                         continue     
         server_socket.close()
 
-    # msg is json string format
+    """
+        process message on server side
+        message could be request (show-all, search, get, insert, delete, update), 
+        value response to get request, or ack.
+
+        msg is in json string format
+    """
     def processMsg(self, msg):
         decoded_msg = yaml.load(msg)
         global AckFlags
@@ -83,6 +96,10 @@ class ServerThread (threading.Thread):
         #print "new pool:", RequestPool
 
 class ClientThread(threading.Thread):
+    """
+        ClientThread:
+            send broadcast request to all replicas in a FIFO manner
+    """
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
         self.threadID = threadID
@@ -149,7 +166,12 @@ class ClientThread(threading.Thread):
         #print "delay: ", delaynum
         MessageQueues[dest].append([datetime.datetime.now()+datetime.timedelta(0,delaynum),messagestr])
 
+
 class ChannelThread (threading.Thread):
+    """
+        ChannelThread:
+            simlulate delay channel
+    """
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
         self.threadID = threadID
@@ -177,7 +199,6 @@ def main():
     threads.append(ClientThread(2, "ClientThread"))
     threads.append(ChannelThread(3, "ChannelThread"))
     
-
     for thread in threads:
         thread.start()
 

@@ -29,12 +29,13 @@ CurrentModel = 0
 ReadFile = False
 
 
-'''
-    ServerThread functionality:
-        receive request from clients 
-        execute read/write opeartions in the local replica
-'''
 class ServerThread (threading.Thread):
+    """
+        ServerThread:
+            receive request from clients 
+            execute commands in the local replica
+    """
+
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
         self.threadID = threadID
@@ -44,6 +45,9 @@ class ServerThread (threading.Thread):
     def run(self):
         self.update()
 
+    """
+        Receive and process message passed by socket on server side
+    """
     def update(self):
         CONNECTION_LIST = []
         RECV_BUFFER = 4096 
@@ -69,10 +73,15 @@ class ServerThread (threading.Thread):
                         continue     
         server_socket.close()
 
-    #msg is json string
-    def processMsg(self, msg):
-        #print "receive msg: ", msg 
-        
+    """
+        process message on server side
+        message could be request (show-all, search, get, insert, delete, update), 
+        value response to get request, or ack.
+
+        msg is in json string format
+    """
+    def processMsg(self, msg):    
+        #Deal with show-all operation    
         if msg == "show-all":
             self.showAll()
             return
@@ -100,12 +109,11 @@ class ServerThread (threading.Thread):
                     print "Server %s: <%s, %s>" % (ch,SearchResult[i][0],SearchResult[i][1])
                 ResultCount = 0
             return
-
-        
+       
+        # Deal with read/write operations
         msg_decoded = yaml.load(msg)
         # Finish inconsistency repair
         msg_sender, msg_type = msg_decoded['sender'], msg_decoded['type']
-        #print "Debug: %s" % (msg_decoded['cmd'])
         #receive from coordinator
         if msg_decoded['sender'] == NUM_NODES:       
             #receive ack 
@@ -222,7 +230,11 @@ class ServerThread (threading.Thread):
         json_str = json.dumps(value_msg, cls=message.MessageEncoder)
         ClientThread.sendMsg(json_str, dest_id)
 
-    #msg is dict decoded from json string
+    """
+        execute request (insert, delete, update, get) on server side
+        
+        msg is in dictionary format (loaded from json string)
+    """
     def executeRequest(self, msg):
         key, cmd = msg['key'], msg['cmd']
         if cmd == "insert":
@@ -261,12 +273,13 @@ class ServerThread (threading.Thread):
         for key, value in self.kvStore.items():
             print "<{key}, {value}>".format(key=key, value=value['value'])
 
-'''
-    ClientThread functionality:
-        receive request from user input 
-        cache requet in a FIFO queue
-'''
+
 class ClientThread (threading.Thread):
+    """
+        ClientThread:
+            receive request from user input 
+            cache requet in a FIFO queue
+    """
     outConnectFlags = [False for i in xrange(NUM_NODES + 1)]
 
     def __init__(self, threadID, name):
@@ -277,6 +290,9 @@ class ClientThread (threading.Thread):
     def run(self):
         self.update()
 
+    """
+        receive and handle request on client side
+    """
     def update(self):
         global ClientSockets
         global ReadFile
@@ -300,9 +316,11 @@ class ClientThread (threading.Thread):
                     print "Reading file Completed!"
                 else:
                     ClientThread.ExeUpdate(cmdline_input[:])
-                
-                #print len(RequestQueue)
 
+    """
+        handle request (delay, show-all, search, insert/delete/update/get)
+        on client side
+    """
     @staticmethod
     def ExeUpdate(cmdline_input):
         global RequestQueue
@@ -353,6 +371,11 @@ class ClientThread (threading.Thread):
         global MessageQueues
         MessageQueues[dest_id].append([datetime.datetime.now()+datetime.timedelta(0,delaynum),messagestr])
 
+    """
+        output response to the request on client side
+        This marks the current request is totally completed
+        and the program could move on to the next request.
+    """
     @staticmethod
     def clientSideOutput(option_value_ts, is_key_valid):
         if RequestQueue:
@@ -393,11 +416,12 @@ class ClientThread (threading.Thread):
             global RequestCompleteTimestamp
             RequestCompleteTimestamp = datetime.datetime.now()
 
-'''
-    RequestThread functionality:
-        handle requests cached in the FIFO queue
-'''
+
 class RequestThread(threading.Thread):
+    """
+        RequestThread:
+            handle requests cached in the FIFO queue
+    """
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
         self.threadID = threadID
@@ -406,6 +430,9 @@ class RequestThread(threading.Thread):
     def run(self):
         self.update()
 
+    """
+        pop and handle request cached in the request queue
+    """
     def update(self):
         global ReadyForNextRequest
         global RequestCompleteTimestamp
@@ -461,11 +488,12 @@ class RequestThread(threading.Thread):
             dest = "peer " + str(dest_id)
         print "Client: sending request to {dest}".format(dest=dest)
 
-'''
-    ChannelThread functionality:
-        simlulate delay channel
-'''
+
 class ChannelThread (threading.Thread):
+    """
+        ChannelThread:
+            simlulate delay channel
+    """
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
         self.threadID = threadID
