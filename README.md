@@ -6,6 +6,7 @@ Ruichao Qiu (rqiu3@illinois.edu)
 Hao Luo		(haoluo3@illinois.edu)
 
 I. Usage 
+
 	A Simulating network delays
 		* usage *
 		Open a terminal and run "./DelayChannel.sh"
