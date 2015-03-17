@@ -14,6 +14,7 @@ for si in xrange(4):
     st.settimeout(2)
     s.append(st)
 
+# Server Side, receive message
 class ServerThread (threading.Thread):
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)
@@ -48,6 +49,7 @@ def RunServer():
                     continue     
     server_socket.close()
 
+# Client Side, send message
 class ClientThread (threading.Thread):
     def __init__(self, threadID, name):
         threading.Thread.__init__(self)

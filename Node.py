@@ -77,6 +77,7 @@ class ServerThread (threading.Thread):
             self.showAll()
             return
 
+        # Response to search operation
         if msg[:6] == "search":
             strlist = msg.split()
             if int(strlist[1]) not in self.kvStore:
@@ -86,6 +87,7 @@ class ServerThread (threading.Thread):
             ClientThread.sendMsg("fetch "+strlist[1]+" "+tmpch+" "+str(NodeID),int(strlist[2]))
             return
 
+        # Deal with search key-value result
         if msg[:5] == "fetch":
             strlist = msg.split()
             global SearchResult
@@ -285,6 +287,7 @@ class ClientThread (threading.Thread):
             for sock in read_sockets:
                 cmdline_input = sys.stdin.readline()
 
+                # Read from file
                 if cmdline_input.strip()[:5] == "start":
                     print "Start reading file..."
                     f = open(NodeName+".txt","r")
