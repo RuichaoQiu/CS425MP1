@@ -26,6 +26,7 @@ ResultCount = 0
 CurrentKey = 0
 ReplicaCounter = 0
 CurrentModel = 0
+ReadFile = False
 
 
 '''
@@ -276,43 +277,62 @@ class ClientThread (threading.Thread):
         self.update()
 
     def update(self):
-        global ClientSockets 
+        global ClientSockets
+        global ReadFile
+        print "Hello, my name is Server %s" % (NodeName) 
         while 1:
             socket_list = [sys.stdin]
             read_sockets, write_sockets, error_sockets = select.select(socket_list , [], []) 
             for sock in read_sockets:
                 cmdline_input = sys.stdin.readline()
 
-                if cmdline_input.strip()[:5] == "delay":
-                    tmpstr = cmdline_input.strip()[6:]
-                    Ltmpstr = tmpstr.split()
-                    global DelayTime
-                    DelayTime = float(Ltmpstr[0])
-                    break
-
-                # utility tool: show-all
-                if cmdline_input.strip() == "show-all":
-                    #print "going to tell server to print out all <key,value> pairs..."
-                    ClientThread.sendMsg("show-all", NodeID)
-                    break
-
-                # utility tool: search key
-                if cmdline_input.strip()[:6] == "search":
-                    for i in xrange(NUM_NODES):
-                        ClientThread.sendMsg(cmdline_input.strip()+" "+str(NodeID), i)
-                    break
-
-                # replica operation: insert/delete/update/get...
-                request = message.Request(cmdline_input)            
-                if not utils.IsCmdValid(request.cmd):
-                    print "Client: Invalid command!"
-                    #TODO: print out help menu
-                    break
-                print "Client: Received request {request} at {timestamp}".format( \
-                    request=cmdline_input.strip(), \
-                    timestamp=datetime.datetime.now().time().strftime("%H:%M:%S"))
-                RequestQueue.append(request)
+                if cmdline_input.strip()[:5] == "start":
+                    print "Start reading file..."
+                    f = open(NodeName+".txt","r")
+                    cmdline_input = f.readline()
+                    while cmdline_input:
+                        print "Read from file: "+cmdline_input
+                        ClientThread.ExeUpdate(cmdline_input)
+                        time.sleep(0.5)
+                        cmdline_input = f.readline()
+                    print "Reading file Completed!"
+                else:
+                    ClientThread.ExeUpdate(cmdline_input)
+                
                 #print len(RequestQueue)
+
+    @staticmethod
+    def ExeUpdate(cmdline_input):
+        global RequestQueue
+        if cmdline_input.strip()[:5] == "delay":
+            tmpstr = cmdline_input.strip()[6:]
+            Ltmpstr = tmpstr.split()
+            global DelayTime
+            DelayTime = float(Ltmpstr[0])
+            return
+
+        # utility tool: show-all
+        if cmdline_input.strip() == "show-all":
+            #print "going to tell server to print out all <key,value> pairs..."
+            ClientThread.sendMsg("show-all", NodeID)
+            return
+
+        # utility tool: search key
+        if cmdline_input.strip()[:6] == "search":
+            for i in xrange(NUM_NODES):
+                ClientThread.sendMsg(cmdline_input.strip()+" "+str(NodeID), i)
+            return
+
+        # replica operation: insert/delete/update/get...
+        request = message.Request(cmdline_input)            
+        if not utils.IsCmdValid(request.cmd):
+            print "Client: Invalid command!"
+            #TODO: print out help menu
+            return
+        print "Client: Received request {request} at {timestamp}".format( \
+            request=cmdline_input.strip(), \
+            timestamp=datetime.datetime.now().time().strftime("%H:%M:%S"))
+        RequestQueue.append(request)
 
     @staticmethod
     #msg is json string
