@@ -96,6 +96,7 @@ class ClientThread(threading.Thread):
         global RequestPool
         global BroadcastFlag 
         global IsKeyValid
+        print "Hello, my name is Coordinator"
         while 1:
             if RequestPool:
                 #print BroadcastFlag
