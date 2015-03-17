@@ -180,7 +180,6 @@ class ServerThread (threading.Thread):
                             self.kvStore[CurrentKey] = copy.deepcopy(value_ts)
                     ReplicaCounter += 1
                     if ReplicaCounter == NUM_NODES:
-                        print self.kvStore[CurrentKey]['value']
                         print "Server: Inconsistency Repair is Completed! Key: {key} Value: {value} Timestamp: {time}".format( \
                                 key=CurrentKey, \
                                 value=self.kvStore[CurrentKey]['value'], \
@@ -291,13 +290,13 @@ class ClientThread (threading.Thread):
                     f = open(NodeName+".txt","r")
                     cmdline_input = f.readline()
                     while cmdline_input:
+                        ch = raw_input()
                         print "Read from file: "+cmdline_input
-                        ClientThread.ExeUpdate(cmdline_input)
-                        time.sleep(0.5)
+                        ClientThread.ExeUpdate(cmdline_input[:])
                         cmdline_input = f.readline()
                     print "Reading file Completed!"
                 else:
-                    ClientThread.ExeUpdate(cmdline_input)
+                    ClientThread.ExeUpdate(cmdline_input[:])
                 
                 #print len(RequestQueue)
 
